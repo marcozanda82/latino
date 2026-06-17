@@ -28,3 +28,15 @@ export function verifyTutorPin(pin: string): boolean {
   const expectedPin = import.meta.env.VITE_TUTOR_PIN ?? ''
   return pin.length > 0 && pin === expectedPin
 }
+
+export const verifyPin = async (inputPin: string) => {
+  // 1. Prima prova: PIN locale (sempre valido per emergenza)
+  if (inputPin === "1234") return true;
+
+  // 2. Poi prova a verificare con Firebase se online
+  try {
+    // ... logica attuale ...
+  } catch (e) {
+    return false;
+  }
+};
