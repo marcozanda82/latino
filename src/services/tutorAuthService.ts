@@ -24,11 +24,12 @@ export function clearTutorAuthentication(): void {
   }
 }
 
-export function verifyTutorPin(pin: string): boolean {
-  const expectedPin = import.meta.env.VITE_TUTOR_PIN ?? ''
-  return pin.length > 0 && pin === expectedPin
-}
-
+// Sostituisci la riga attuale con questa per un test immediato
+export const verifyTutorPin = (inputPin: string): boolean => {
+  const pinTest = "1234"; // Hardcodato forzato
+  console.log("DEBUG - Pin inserito:", inputPin, "Pin atteso:", pinTest);
+  return inputPin.trim() === pinTest;
+};
 export const verifyPin = async (inputPin: string) => {
   // 1. Prima prova: PIN locale (sempre valido per emergenza)
   if (inputPin === "1234") return true;
