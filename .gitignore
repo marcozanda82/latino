@@ -1,0 +1,19 @@
+# Node
+node_modules
+dist
+dist-ssr
+*.local
+
+# Firebase
+.firebase
+.env
+.env.*
+!.env.example
+
+# Log e debug
+npm-debug.log*
+yarn-debug.log*
+yarn-test.log*
+
+# Vari
+.DS_Store

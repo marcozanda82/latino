@@ -1,0 +1,32 @@
+{
+  "frase_originale": "Caesar exercitum in proelium ducit",
+  "parole_array": ["Caesar", "exercitum", "in", "proelium", "ducit"],
+  "step1_verbo": {
+    "parola_corretta": "ducit",
+    "spiegazione_errore": "Cerca una parola che esprima un'azione o uno stato, solitamente alla fine della frase."
+  },
+  "step2_analisi_verbo": {
+    "modo": "indicativo",
+    "tempo": "presente",
+    "persona": "3",
+    "numero": "singolare",
+    "forma": "attiva"
+  },
+  "step3_soggetto": {
+    "parole_corrette": ["Caesar"],
+    "sottinteso": false
+  },
+  "step4_nucleo_tradotto": "Cesare conduce",
+  "step5_complementi": [
+    {
+      "parole": ["exercitum"],
+      "caso": "accusativo",
+      "traduzione": "l'esercito"
+    },
+    {
+      "parole": ["in", "proelium"],
+      "caso": "accusativo",
+      "traduzione": "in battaglia"
+    }
+  ]
+}
