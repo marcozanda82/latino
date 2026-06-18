@@ -3,6 +3,7 @@ import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-route
 import { Toaster } from 'sonner'
 import { ExerciseProvider } from './context/ExerciseContext'
 import { AdminDashboard } from './components/AdminDashboard'
+import Diagnostic from './components/Diagnostic'
 import { PageTransition } from './components/layout/PageTransition'
 import { PlayLevel } from './components/PlayLevel'
 import { StudentHome } from './components/StudentHome'
@@ -48,23 +49,31 @@ function AnimatedRoutes() {
 
 function App() {
   return (
-    <ExerciseProvider>
-      <BrowserRouter>
-        <AnimatedRoutes />
-        <Toaster
-          position="top-right"
-          richColors
-          closeButton
-          toastOptions={{
-            classNames: {
-              toast: 'font-sans shadow-lift border border-slate-200/80',
-              title: 'text-slate-800 font-medium',
-              description: 'text-slate-600',
-            },
-          }}
+    <BrowserRouter>
+      <Routes>
+        <Route path="/diagnostic" element={<Diagnostic />} />
+        <Route
+          path="*"
+          element={
+            <ExerciseProvider>
+              <AnimatedRoutes />
+              <Toaster
+                position="top-right"
+                richColors
+                closeButton
+                toastOptions={{
+                  classNames: {
+                    toast: 'font-sans shadow-lift border border-slate-200/80',
+                    title: 'text-slate-800 font-medium',
+                    description: 'text-slate-600',
+                  },
+                }}
+              />
+            </ExerciseProvider>
+          }
         />
-      </BrowserRouter>
-    </ExerciseProvider>
+      </Routes>
+    </BrowserRouter>
   )
 }
 
