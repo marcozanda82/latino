@@ -21,9 +21,48 @@ import {
   groupLevelsByName,
   isGroupUnlocked,
 } from '../utils/levelGroups'
+import {
+  subscribeToStudentEvaluations,
+} from '../services/firebaseEvaluations'
+import type { PendingTranslation } from '../types/evaluation'
 
 const HIDDEN_ACTION_CLICKS = 5
 const HIDDEN_ACTION_RESET_MS = 2000
+
+function EvaluationBadge({ evalData }: { evalData: PendingTranslation }) {
+  switch (evalData.status) {
+    case 'in_attesa':
+      return (
+        <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-sky-200/80 bg-sky-50/90 px-2.5 py-1 text-xs font-medium text-sky-800">
+          <span aria-hidden>⏳</span>
+          In attesa del tutor
+        </span>
+      )
+    case 'verde':
+      return (
+        <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-emerald-200/80 bg-emerald-50/90 px-2.5 py-1 text-xs font-semibold tabular-nums text-emerald-800">
+          <span aria-hidden>🟢</span>
+          {evalData.totalScore ?? evalData.mechanicalScore}/100
+        </span>
+      )
+    case 'giallo':
+      return (
+        <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-amber-200/80 bg-amber-50/90 px-2.5 py-1 text-xs font-semibold tabular-nums text-amber-900">
+          <span aria-hidden>🟡</span>
+          {evalData.totalScore ?? evalData.mechanicalScore}/100
+        </span>
+      )
+    case 'rosso':
+      return (
+        <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-rose-200/80 bg-rose-50/90 px-2.5 py-1 text-xs font-semibold tabular-nums text-rose-800">
+          <span aria-hidden>🔴</span>
+          {evalData.totalScore ?? evalData.mechanicalScore}/100
+        </span>
+      )
+    default:
+      return null
+  }
+}
 
 export function StudentHome() {
   const navigate = useNavigate()
@@ -35,6 +74,19 @@ export function StudentHome() {
   )
   const [hiddenClickCount, setHiddenClickCount] = useState(0)
   const [showPinModal, setShowPinModal] = useState(false)
+  const [evaluations, setEvaluations] = useState<PendingTranslation[]>([])
+
+  const evaluationsMap = useMemo(() => {
+    const map: Record<string, PendingTranslation> = {}
+
+    evaluations.forEach((evaluation) => {
+      if (!map[evaluation.fraseOriginale]) {
+        map[evaluation.fraseOriginale] = evaluation
+      }
+    })
+
+    return map
+  }, [evaluations])
 
   const groupedLevels = useMemo(() => groupLevelsByName(levels), [levels])
 
@@ -47,6 +99,11 @@ export function StudentHome() {
     refreshProgress()
     getSettings().then(setSettings)
   }, [refreshProgress])
+
+  useEffect(() => {
+    const unsubscribe = subscribeToStudentEvaluations(setEvaluations)
+    return unsubscribe
+  }, [])
 
   useEffect(() => {
     if (hiddenClickCount === 0) return
@@ -146,6 +203,10 @@ export function StudentHome() {
                     const entry = progress[level.id]
                     const bestScore = entry?.bestScore
                     const isCompleted = bestScore !== undefined
+                    const evalData =
+                      evaluationsMap[level.analysis.frase_originale]
+                    const isAwaitingTutor = evalData?.status === 'in_attesa'
+                    const isPlayable = unlocked && !isAwaitingTutor
 
                     const cardContent = (
                       <>
@@ -153,15 +214,16 @@ export function StudentHome() {
                           <p className="text-xs font-semibold uppercase tracking-widest text-slate-500">
                             Livello {index + 1}
                           </p>
-                          {!unlocked ? (
-                            <span className="shrink-0 text-xs text-slate-500">
-                              🔒
-                            </span>
-                          ) : isCompleted ? (
-                            <span className="shrink-0 rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-medium text-emerald-700">
-                              ✅ Completato
-                            </span>
-                          ) : null}
+                          <div className="flex shrink-0 flex-col items-end gap-2">
+                            {evalData && <EvaluationBadge evalData={evalData} />}
+                            {!unlocked ? (
+                              <span className="text-xs text-slate-500">🔒</span>
+                            ) : isCompleted && !evalData ? (
+                              <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-medium text-emerald-700">
+                                ✅ Completato
+                              </span>
+                            ) : null}
+                          </div>
                         </div>
                         <h3 className="mt-3 text-base font-semibold text-slate-800">
                           {level.title}
@@ -172,6 +234,11 @@ export function StudentHome() {
                         <p className="mt-5 text-xs font-medium text-emerald-700">
                           {!unlocked ? (
                             <span className="text-slate-500">Bloccato</span>
+                          ) : isAwaitingTutor ? (
+                            <span className="text-sky-700">
+                              Valutazione in corso — non puoi ripetere questa
+                              frase
+                            </span>
                           ) : isCompleted ? (
                             <>
                               🏆 Miglior Punteggio: {bestScore} XP
@@ -188,10 +255,13 @@ export function StudentHome() {
 
                     const cardClassName = [
                       'block text-left transition-all duration-200',
-                      isCompleted
+                      isCompleted && !isAwaitingTutor
                         ? 'border-emerald-200/80 bg-emerald-50/70 hover:border-emerald-300'
                         : '',
-                      unlocked
+                      isAwaitingTutor
+                        ? 'cursor-not-allowed opacity-90'
+                        : '',
+                      isPlayable
                         ? 'hover:-translate-y-0.5 hover:shadow-lift active:scale-[0.98]'
                         : 'cursor-not-allowed opacity-70',
                     ]
@@ -205,7 +275,7 @@ export function StudentHome() {
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: index * 0.05 }}
                       >
-                        {unlocked ? (
+                        {isPlayable ? (
                           <Link to={`/play/${level.id}`} className={cardClassName}>
                             <GlassCard className="!p-6">{cardContent}</GlassCard>
                           </Link>

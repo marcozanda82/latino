@@ -25,6 +25,9 @@ import { getPrimaryTranslation } from '../utils/textNormalization'
 
 type AppStep = 1 | 2 | 3 | 4 | 5
 
+const MECHANICAL_SCORE_INITIAL = 60
+const MECHANICAL_PENALTY = 2
+
 const STEP_LABELS: Record<AppStep, string> = {
   1: 'Identifica il verbo',
   2: 'Analisi del verbo',
@@ -53,6 +56,7 @@ export function LatinTranslator({
   const [step4Complete, setStep4Complete] = useState(false)
   const [step5Complete, setStep5Complete] = useState(false)
   const [score, setScore] = useState(XP_INITIAL)
+  const [mechanicalScore, setMechanicalScore] = useState(MECHANICAL_SCORE_INITIAL)
   const [studentCoreTranslation, setStudentCoreTranslation] = useState('')
   const [studentComplementTranslations, setStudentComplementTranslations] =
     useState<string[]>([])
@@ -65,9 +69,21 @@ export function LatinTranslator({
     }
   }, [step5Complete, levelId, score])
 
-  const handleMistake = useCallback((penalty: number) => {
+  const handleMistake = useCallback(() => {
+    setMechanicalScore((prev) => Math.max(0, prev - MECHANICAL_PENALTY))
+  }, [])
+
+  const handleXpMistake = useCallback((penalty: number) => {
     setScore((current) => applyPenalty(current, penalty))
   }, [])
+
+  const handleStepMistake = useCallback(
+    (penalty: number) => {
+      handleMistake()
+      handleXpMistake(penalty)
+    },
+    [handleMistake, handleXpMistake],
+  )
 
   const handleStepChange = (step: AppStep) => {
     setCurrentStep(step)
@@ -113,6 +129,7 @@ export function LatinTranslator({
         fraseOriginale: analysis.frase_originale,
         traduzioneAttesa: fullTranslation,
         traduzioneStudente: studentFullTranslation,
+        mechanicalScore,
       })
       setIsSubmitted(true)
     } catch (error) {
@@ -145,8 +162,11 @@ export function LatinTranslator({
     <AppLayout
       header={
         <div className="relative">
-          <div className="absolute right-0 top-0">
+          <div className="absolute right-0 top-0 flex flex-col items-end gap-2">
             <ScoreBadge score={score} />
+            <span className="rounded-full border border-slate-200 bg-white/90 px-3 py-1 text-xs font-semibold tabular-nums text-slate-700 shadow-sm">
+              Analisi: {mechanicalScore}/60
+            </span>
           </div>
 
           <p className="text-xs font-semibold uppercase tracking-widest text-slate-500">
@@ -200,7 +220,7 @@ export function LatinTranslator({
                   analysis={analysis}
                   onVerbComplete={() => setStep1Complete(true)}
                   onError={showError}
-                  onMistake={() => handleMistake(XP_PENALTY_DRAG)}
+                  onMistake={() => handleStepMistake(XP_PENALTY_DRAG)}
                   showAvantiButton={false}
                 />
               </motion.div>
@@ -219,7 +239,7 @@ export function LatinTranslator({
                   analisiVerbo={analysis.step2_analisi_verbo}
                   onComplete={() => setStep2Complete(true)}
                   onError={showError}
-                  onMistake={() => handleMistake(XP_PENALTY_CHIP)}
+                  onMistake={() => handleStepMistake(XP_PENALTY_CHIP)}
                 />
               </motion.div>
             )}
@@ -236,7 +256,7 @@ export function LatinTranslator({
                   analysis={analysis}
                   onComplete={() => setStep3Complete(true)}
                   onError={showError}
-                  onMistake={() => handleMistake(XP_PENALTY_DRAG)}
+                  onMistake={() => handleStepMistake(XP_PENALTY_DRAG)}
                 />
               </motion.div>
             )}
@@ -256,7 +276,7 @@ export function LatinTranslator({
                   referenceTranslation={analysis.step4_nucleo_tradotto}
                   onComplete={() => setStep4Complete(true)}
                   onTranslationConfirmed={setStudentCoreTranslation}
-                  onMistake={() => handleMistake(XP_PENALTY_RETRY)}
+                  onMistake={() => handleStepMistake(XP_PENALTY_RETRY)}
                 />
               </motion.div>
             )}
@@ -274,8 +294,8 @@ export function LatinTranslator({
                   onComplete={() => setStep5Complete(true)}
                   onTranslationConfirmed={handleComplementTranslationConfirmed}
                   onError={showError}
-                  onMistakeChip={() => handleMistake(XP_PENALTY_CHIP)}
-                  onMistakeRetry={() => handleMistake(XP_PENALTY_RETRY)}
+                  onMistakeChip={() => handleStepMistake(XP_PENALTY_CHIP)}
+                  onMistakeRetry={() => handleStepMistake(XP_PENALTY_RETRY)}
                 />
               </motion.div>
             )}
@@ -382,8 +402,10 @@ export function LatinTranslator({
                 ) : (
                   <GlassCard className="mt-6 border border-sky-200 bg-sky-50/80 !p-5 text-center">
                     <p className="text-sm font-medium text-sky-900">
-                      🚀 Traduzione inviata con successo! In attesa della valutazione
-                      del tutor.
+                      Analisi completata! Hai protetto {mechanicalScore} punti su
+                      60. La traduzione è stata inviata per la valutazione
+                      finale: puoi guadagnare fino a +40 punti di Bonus
+                      Traduzione!
                     </p>
                   </GlassCard>
                 )}

@@ -20,7 +20,7 @@ interface Step3SubjectSelectionProps {
   analysis: LatinAnalysis
   onComplete: () => void
   onError: (message: string) => void
-  onMistake: () => void
+  onMistake?: () => void
 }
 
 function buildRemainingWords(analysis: LatinAnalysis): string[] {
@@ -88,7 +88,7 @@ export function Step3SubjectSelection({
 
       if (isImplicitExpected) {
         setErrorTileId(tile.id)
-        onMistake()
+        onMistake?.()
         onError(SUBJECT_ERROR_MESSAGES.WRONG_TILE)
         window.setTimeout(() => setErrorTileId(null), 600)
         return
@@ -96,7 +96,7 @@ export function Step3SubjectSelection({
 
       if (!expectedWords.includes(tile.word)) {
         setErrorTileId(tile.id)
-        onMistake()
+        onMistake?.()
         onError(SUBJECT_ERROR_MESSAGES.WRONG_TILE)
         window.setTimeout(() => setErrorTileId(null), 600)
         return
@@ -137,7 +137,7 @@ export function Step3SubjectSelection({
     }
 
     setImplicitShaking(true)
-    onMistake()
+    onMistake?.()
     onError(SUBJECT_ERROR_MESSAGES.WRONG_IMPLICIT)
     window.setTimeout(() => setImplicitShaking(false), 500)
   }, [isComplete, isImplicitExpected, onComplete, onError, onMistake])

@@ -16,8 +16,8 @@ interface Step5SatellitesProps {
   onComplete: () => void
   onTranslationConfirmed?: (translation: string) => void
   onError: (message: string) => void
-  onMistakeChip: () => void
-  onMistakeRetry: () => void
+  onMistakeChip?: () => void
+  onMistakeRetry?: () => void
 }
 
 interface CaseChipProps {
@@ -110,7 +110,7 @@ export function Step5Satellites({
     }
 
     setShakingCase(caseValue)
-    onMistakeChip()
+    onMistakeChip?.()
     onError(CASE_ERROR_TOAST)
     window.setTimeout(() => setShakingCase(null), 500)
   }

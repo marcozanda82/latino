@@ -1,19 +1,15 @@
 import { motion } from 'framer-motion'
 import { GlassCard } from './ui/GlassCard'
-
-type EvaluationStatus = 'in_attesa' | 'verde' | 'giallo' | 'rosso'
-
-interface PendingTranslation {
-  id: string
-  fraseOriginale: string
-  traduzioneAttesa: string
-  traduzioneStudente: string
-  status: EvaluationStatus
-}
+import type { EvaluationStatus, PendingTranslation } from '../types/evaluation'
 
 interface TutorDashboardProps {
   pendingTranslations: PendingTranslation[]
-  onEvaluate: (id: string, status: EvaluationStatus) => void
+  onEvaluate: (
+    id: string,
+    status: EvaluationStatus,
+    bonusScore: number,
+    mechanicalScore: number,
+  ) => void
 }
 
 const STATUS_LABELS: Record<EvaluationStatus, string> = {
@@ -48,23 +44,27 @@ const STATUS_STYLES: Record<
 const EVALUATION_ACTIONS: Array<{
   status: Exclude<EvaluationStatus, 'in_attesa'>
   label: string
+  bonusScore: number
   className: string
 }> = [
   {
     status: 'verde',
-    label: 'Corretta',
+    label: 'Perfetto',
+    bonusScore: 40,
     className:
       'border-emerald-500 bg-emerald-500 text-white hover:bg-emerald-600',
   },
   {
     status: 'giallo',
-    label: 'Parziale',
+    label: 'Imprecisa',
+    bonusScore: 20,
     className:
       'border-amber-400 bg-amber-400 text-white hover:bg-amber-500',
   },
   {
     status: 'rosso',
-    label: 'Errata',
+    label: 'Sbagliata',
+    bonusScore: 0,
     className: 'border-rose-500 bg-rose-500 text-white hover:bg-rose-600',
   },
 ]
@@ -146,6 +146,26 @@ export function TutorDashboard({
                   <div className="mt-5 grid gap-4 md:grid-cols-2">
                     <div className="rounded-lg border border-slate-100 bg-slate-50 px-4 py-3">
                       <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">
+                        Punteggio meccanico
+                      </p>
+                      <p className="mt-2 text-sm font-medium text-slate-800">
+                        {item.mechanicalScore}/60
+                      </p>
+                    </div>
+
+                    <div className="rounded-lg border border-slate-100 bg-slate-50 px-4 py-3">
+                      <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">
+                        Bonus traduzione (max)
+                      </p>
+                      <p className="mt-2 text-sm font-medium text-slate-800">
+                        +40 punti
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="mt-5 grid gap-4 md:grid-cols-2">
+                    <div className="rounded-lg border border-slate-100 bg-slate-50 px-4 py-3">
+                      <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">
                         Traduzione attesa
                       </p>
                       <p className="mt-2 text-sm font-medium text-slate-800">
@@ -169,7 +189,14 @@ export function TutorDashboard({
                         <button
                           key={action.status}
                           type="button"
-                          onClick={() => onEvaluate(item.id, action.status)}
+                          onClick={() =>
+                            onEvaluate(
+                              item.id,
+                              action.status,
+                              action.bonusScore,
+                              item.mechanicalScore,
+                            )
+                          }
                           className={`rounded-lg border px-4 py-2.5 text-sm font-medium shadow-sm transition-colors ${action.className}`}
                         >
                           {action.label}
@@ -177,12 +204,33 @@ export function TutorDashboard({
                       ))}
                     </div>
                   ) : (
-                    <p className="mt-5 text-sm text-slate-500">
-                      Valutazione registrata:{' '}
-                      <span className="font-medium text-slate-700">
-                        {STATUS_LABELS[item.status]}
-                      </span>
-                    </p>
+                    <div className="mt-5 rounded-xl border border-slate-200 bg-slate-50/80 p-5">
+                      <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">
+                        Riepilogo voto
+                      </p>
+                      <dl className="mt-4 space-y-2 text-sm text-slate-700">
+                        <div className="flex justify-between gap-4">
+                          <dt>Punteggio Meccanico</dt>
+                          <dd className="font-medium tabular-nums">
+                            {item.mechanicalScore}/60
+                          </dd>
+                        </div>
+                        <div className="flex justify-between gap-4">
+                          <dt>Bonus Traduzione</dt>
+                          <dd className="font-medium tabular-nums">
+                            +{item.bonusScore ?? 0}/40
+                          </dd>
+                        </div>
+                      </dl>
+                      <div className="mt-4 flex items-center justify-between gap-4 border-t border-slate-200 pt-4">
+                        <span className="text-sm font-semibold text-slate-800">
+                          Voto Finale
+                        </span>
+                        <span className="rounded-full border border-slate-800 bg-slate-800 px-4 py-1.5 text-lg font-bold tabular-nums text-white shadow-sm">
+                          {item.totalScore ?? item.mechanicalScore} / 100
+                        </span>
+                      </div>
+                    </div>
                   )}
                 </GlassCard>
               </motion.li>
@@ -194,4 +242,4 @@ export function TutorDashboard({
   )
 }
 
-export type { EvaluationStatus, PendingTranslation, TutorDashboardProps }
+export type { TutorDashboardProps }

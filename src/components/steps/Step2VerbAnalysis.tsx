@@ -16,7 +16,7 @@ interface Step2VerbAnalysisProps {
   analisiVerbo: Step2AnalisiVerbo
   onComplete: () => void
   onError: (message: string) => void
-  onMistake: () => void
+  onMistake?: () => void
 }
 
 const ERROR_TOAST =
@@ -139,7 +139,7 @@ export function Step2VerbAnalysis({
 
       setShakingChip(chipKey)
       setErrorChip(chipKey)
-      onMistake()
+      onMistake?.()
       onError(ERROR_TOAST)
 
       window.setTimeout(() => {

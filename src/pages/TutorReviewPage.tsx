@@ -4,7 +4,7 @@ import { TutorDashboard } from '../components/TutorDashboard'
 import type {
   EvaluationStatus,
   PendingTranslation,
-} from '../components/TutorDashboard'
+} from '../types/evaluation'
 import { AppLayout } from '../components/layout/AppLayout'
 import { showError, showSuccess } from '../lib/toast'
 import { clearTutorAuthentication } from '../services/tutorAuthService'
@@ -32,12 +32,21 @@ export function TutorReviewPage() {
   }, [])
 
   const handleEvaluate = useCallback(
-    async (id: string, status: EvaluationStatus) => {
+    async (
+      id: string,
+      status: EvaluationStatus,
+      bonusScore: number,
+      mechanicalScore: number,
+    ) => {
       if (status === 'in_attesa') return
 
+      const totalScore = mechanicalScore + bonusScore
+
       try {
-        await updateEvaluationStatus(id, status)
-        showSuccess(STATUS_SUCCESS_LABELS[status])
+        await updateEvaluationStatus(id, status, bonusScore, totalScore)
+        showSuccess(
+          `${STATUS_SUCCESS_LABELS[status]} Voto finale: ${totalScore}/100.`,
+        )
       } catch (error) {
         console.error('[TutorReviewPage] handleEvaluate failed:', error)
         showError('Impossibile salvare la valutazione. Riprova.')

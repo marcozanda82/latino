@@ -16,7 +16,7 @@ interface Step1VerbSelectionProps {
   analysis: LatinAnalysis
   onVerbComplete: () => void
   onError: (message: string) => void
-  onMistake: () => void
+  onMistake?: () => void
   showAvantiButton?: boolean
   onAdvance?: () => void
 }
@@ -85,7 +85,7 @@ export function Step1VerbSelection({
         setIsComplete(true)
       } else {
         setErrorTileId(tile.id)
-        onMistake()
+        onMistake?.()
         onError(analysis.step1_verbo.spiegazione_errore)
         window.setTimeout(() => setErrorTileId(null), 600)
       }

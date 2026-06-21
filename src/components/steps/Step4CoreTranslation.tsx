@@ -10,7 +10,7 @@ interface Step4CoreTranslationProps {
   referenceTranslation: TranslationValue
   onComplete: () => void
   onTranslationConfirmed?: (translation: string) => void
-  onMistake: () => void
+  onMistake?: () => void
 }
 
 function buildLatinCore(
