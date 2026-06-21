@@ -1,4 +1,5 @@
 export const VALID_CASES = [
+  'nominativo',
   'genitivo',
   'dativo',
   'accusativo',
@@ -12,6 +13,7 @@ export const VALID_CASES = [
 export type LatinCase = (typeof VALID_CASES)[number]
 
 export const CASE_CHIP_LABELS: Record<LatinCase, string> = {
+  nominativo: 'Nominativo',
   genitivo: 'Genitivo',
   dativo: 'Dativo',
   accusativo: 'Accusativo',
