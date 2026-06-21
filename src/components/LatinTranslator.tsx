@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Step1VerbSelection } from './steps/Step1VerbSelection'
 import { Step2VerbAnalysis } from './steps/Step2VerbAnalysis'
@@ -20,6 +20,7 @@ import {
 } from '../utils/gamification'
 import type { LatinAnalysis } from '../types'
 import { saveLevelScore } from '../services/progressService'
+import { submitTranslationForReview } from '../services/firebaseEvaluations'
 import { getPrimaryTranslation } from '../utils/textNormalization'
 
 type AppStep = 1 | 2 | 3 | 4 | 5
@@ -52,6 +53,11 @@ export function LatinTranslator({
   const [step4Complete, setStep4Complete] = useState(false)
   const [step5Complete, setStep5Complete] = useState(false)
   const [score, setScore] = useState(XP_INITIAL)
+  const [studentCoreTranslation, setStudentCoreTranslation] = useState('')
+  const [studentComplementTranslations, setStudentComplementTranslations] =
+    useState<string[]>([])
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isSubmitted, setIsSubmitted] = useState(false)
 
   useEffect(() => {
     if (step5Complete && levelId) {
@@ -67,8 +73,54 @@ export function LatinTranslator({
     setCurrentStep(step)
     if (step < 2) setStep2Complete(false)
     if (step < 3) setStep3Complete(false)
-    if (step < 4) setStep4Complete(false)
-    if (step < 5) setStep5Complete(false)
+    if (step < 4) {
+      setStep4Complete(false)
+      setStudentCoreTranslation('')
+      setStudentComplementTranslations([])
+      setIsSubmitted(false)
+    }
+    if (step < 5) {
+      setStep5Complete(false)
+      setStudentComplementTranslations([])
+      setIsSubmitted(false)
+    }
+  }
+
+  const handleComplementTranslationConfirmed = useCallback(
+    (translation: string) => {
+      setStudentComplementTranslations((current) => [...current, translation])
+    },
+    [],
+  )
+
+  const studentFullTranslation = useMemo(
+    () =>
+      [studentCoreTranslation, ...studentComplementTranslations]
+        .filter(Boolean)
+        .join(' ')
+        .replace(/\s+/g, ' ')
+        .trim(),
+    [studentCoreTranslation, studentComplementTranslations],
+  )
+
+  const handleSubmitToTutor = async () => {
+    if (!studentFullTranslation.trim() || isSubmitting || isSubmitted) return
+
+    setIsSubmitting(true)
+
+    try {
+      await submitTranslationForReview({
+        fraseOriginale: analysis.frase_originale,
+        traduzioneAttesa: fullTranslation,
+        traduzioneStudente: studentFullTranslation,
+      })
+      setIsSubmitted(true)
+    } catch (error) {
+      console.error('[LatinTranslator] handleSubmitToTutor failed:', error)
+      showError('Impossibile inviare la traduzione al tutor. Riprova.')
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   const showAvanti = currentStep >= 1 && currentStep <= 4
@@ -203,6 +255,7 @@ export function LatinTranslator({
                   isSubjectImplicit={analysis.step3_soggetto.sottinteso}
                   referenceTranslation={analysis.step4_nucleo_tradotto}
                   onComplete={() => setStep4Complete(true)}
+                  onTranslationConfirmed={setStudentCoreTranslation}
                   onMistake={() => handleMistake(XP_PENALTY_RETRY)}
                 />
               </motion.div>
@@ -219,6 +272,7 @@ export function LatinTranslator({
                 <Step5Satellites
                   complementi={analysis.step5_complementi}
                   onComplete={() => setStep5Complete(true)}
+                  onTranslationConfirmed={handleComplementTranslationConfirmed}
                   onError={showError}
                   onMistakeChip={() => handleMistake(XP_PENALTY_CHIP)}
                   onMistakeRetry={() => handleMistake(XP_PENALTY_RETRY)}
@@ -301,7 +355,38 @@ export function LatinTranslator({
                       {fullTranslation}
                     </p>
                   </div>
+
+                  {studentFullTranslation && (
+                    <div className="border-t border-emerald-100 pt-4">
+                      <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">
+                        La tua traduzione
+                      </p>
+                      <p className="mt-2 text-lg font-medium text-slate-800">
+                        {studentFullTranslation}
+                      </p>
+                    </div>
+                  )}
                 </div>
+
+                {!isSubmitted ? (
+                  <div className="mt-6 flex justify-center">
+                    <button
+                      type="button"
+                      onClick={handleSubmitToTutor}
+                      disabled={isSubmitting || !studentFullTranslation.trim()}
+                      className="rounded-lg border border-sky-600 bg-sky-600 px-8 py-3 text-sm font-medium text-white shadow-sm transition-all hover:bg-sky-700 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-200 disabled:text-slate-400"
+                    >
+                      {isSubmitting ? 'Invio in corso…' : 'Invia per la correzione'}
+                    </button>
+                  </div>
+                ) : (
+                  <GlassCard className="mt-6 border border-sky-200 bg-sky-50/80 !p-5 text-center">
+                    <p className="text-sm font-medium text-sky-900">
+                      🚀 Traduzione inviata con successo! In attesa della valutazione
+                      del tutor.
+                    </p>
+                  </GlassCard>
+                )}
 
                 <div className="mt-8 flex justify-center">
                   <button

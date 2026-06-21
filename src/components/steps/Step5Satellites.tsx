@@ -14,6 +14,7 @@ import {
 interface Step5SatellitesProps {
   complementi: Complemento[]
   onComplete: () => void
+  onTranslationConfirmed?: (translation: string) => void
   onError: (message: string) => void
   onMistakeChip: () => void
   onMistakeRetry: () => void
@@ -74,6 +75,7 @@ function CaseChip({
 export function Step5Satellites({
   complementi,
   onComplete,
+  onTranslationConfirmed,
   onError,
   onMistakeChip,
   onMistakeRetry,
@@ -200,6 +202,7 @@ export function Step5Satellites({
               referenceTranslation={current.traduzione}
               placeholder="Traduci questo complemento in italiano..."
               onConfirmed={handleTranslationConfirmed}
+              onTranslationConfirmed={onTranslationConfirmed}
               onRetry={onMistakeRetry}
             />
           </motion.section>

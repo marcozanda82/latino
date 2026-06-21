@@ -11,6 +11,7 @@ interface SelfAssessmentTranslationProps {
   referenceTranslation: TranslationValue
   placeholder?: string
   onConfirmed: () => void
+  onTranslationConfirmed?: (translation: string) => void
   onRetry?: () => void
   onSuccessChange?: (success: boolean) => void
 }
@@ -20,6 +21,7 @@ export function SelfAssessmentTranslation({
   referenceTranslation,
   placeholder = 'Traduci in italiano...',
   onConfirmed,
+  onTranslationConfirmed,
   onRetry,
   onSuccessChange,
 }: SelfAssessmentTranslationProps) {
@@ -35,10 +37,15 @@ export function SelfAssessmentTranslation({
     onSuccessChange?.(isSuccess)
   }, [isSuccess, onSuccessChange])
 
+  const confirmTranslation = (text: string) => {
+    onTranslationConfirmed?.(text.trim())
+  }
+
   const handleVerify = () => {
     if (!translation.trim() || isSuccess) return
 
     if (matchesTranslation(translation, referenceTranslation)) {
+      confirmTranslation(translation)
       setIsAutoSuccess(true)
       setIsSuccess(true)
       window.setTimeout(() => onConfirmed(), 1000)
@@ -54,6 +61,7 @@ export function SelfAssessmentTranslation({
   }
 
   const handleConfirm = () => {
+    confirmTranslation(translation)
     setIsSuccess(true)
     onConfirmed()
   }

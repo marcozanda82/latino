@@ -9,6 +9,7 @@ interface Step4CoreTranslationProps {
   isSubjectImplicit: boolean
   referenceTranslation: TranslationValue
   onComplete: () => void
+  onTranslationConfirmed?: (translation: string) => void
   onMistake: () => void
 }
 
@@ -27,6 +28,7 @@ export function Step4CoreTranslation({
   isSubjectImplicit,
   referenceTranslation,
   onComplete,
+  onTranslationConfirmed,
   onMistake,
 }: Step4CoreTranslationProps) {
   const [isSuccess, setIsSuccess] = useState(false)
@@ -59,6 +61,7 @@ export function Step4CoreTranslation({
         referenceTranslation={referenceTranslation}
         placeholder="Traduci il nucleo in italiano..."
         onConfirmed={onComplete}
+        onTranslationConfirmed={onTranslationConfirmed}
         onRetry={onMistake}
         onSuccessChange={setIsSuccess}
       />
