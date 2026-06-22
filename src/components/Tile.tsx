@@ -1,7 +1,9 @@
+import { useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { useDraggable } from '@dnd-kit/core'
 import { CSS } from '@dnd-kit/utilities'
 import type { TileStatus } from '../types'
+import { DRAG_TILE_SURFACE_CLASS } from '../constants/dragAndDrop'
 
 interface TileProps {
   id: string
@@ -24,11 +26,26 @@ export function Tile({ id, word, status, disabled = false }: TileProps) {
   const isError = status === 'error'
   const isPlaced = status === 'placed'
 
+  useEffect(() => {
+    if (!isDragging) return
+
+    const blockNativeTouchScroll = (event: TouchEvent) => {
+      event.preventDefault()
+    }
+
+    document.addEventListener('touchmove', blockNativeTouchScroll, {
+      passive: false,
+    })
+
+    return () => {
+      document.removeEventListener('touchmove', blockNativeTouchScroll)
+    }
+  }, [isDragging])
+
   return (
     <motion.div
       ref={setNodeRef}
       style={style}
-      layout
       initial={false}
       animate={
         isDragging
@@ -52,13 +69,14 @@ export function Tile({ id, word, status, disabled = false }: TileProps) {
             : { type: 'spring', stiffness: 320, damping: 26 }
       }
       className={[
-        'draggable-item relative z-10 rounded-xl border px-5 py-3 font-serif text-lg tracking-wide transition-shadow',
+        DRAG_TILE_SURFACE_CLASS,
+        'relative z-10 transition-shadow',
         isDragging
-          ? 'z-20 cursor-grabbing border-slate-300 bg-white shadow-lift'
-          : 'cursor-pointer shadow-sm',
+          ? 'z-20 cursor-grabbing border-slate-300 bg-white opacity-40 shadow-lift'
+          : 'cursor-pointer border-slate-200 bg-white/90 text-slate-800 shadow-sm can-hover:hover:border-slate-300 can-hover:hover:shadow-md',
         isPlaced
           ? 'border-emerald-400 bg-emerald-50 text-emerald-800 shadow-emerald-100'
-          : 'border-slate-200 bg-white/90 text-slate-800 can-hover:hover:border-slate-300 can-hover:hover:shadow-md',
+          : '',
         disabled && !isPlaced ? 'pointer-events-none opacity-40' : '',
       ]
         .filter(Boolean)

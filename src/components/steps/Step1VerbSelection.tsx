@@ -9,6 +9,11 @@ import { motion } from 'framer-motion'
 import { DropZone } from '../DropZone'
 import { Shelf } from '../Shelf'
 import { DROP_ZONE_IDS } from '../../constants/dropZones'
+import {
+  DRAG_MEASURING,
+  DRAG_OVERLAY_MODIFIERS,
+  DRAG_TILE_SURFACE_CLASS,
+} from '../../constants/dragAndDrop'
 import { useDragSensors } from '../../hooks/useDragSensors'
 import type { LatinAnalysis, TileData } from '../../types'
 
@@ -68,6 +73,7 @@ export function Step1VerbSelection({
 
   const handleDragEnd = useCallback(
     (event: DragEndEvent) => {
+      console.log('[DEBUG DROP] Drop completato. event.over:', event.over)
       setDraggingTileId(null)
 
       const { active, over } = event
@@ -103,6 +109,7 @@ export function Step1VerbSelection({
   return (
     <DndContext
       sensors={sensors}
+      measuring={DRAG_MEASURING}
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
     >
@@ -142,9 +149,15 @@ export function Step1VerbSelection({
         )}
       </div>
 
-      <DragOverlay dropAnimation={null}>
+      <DragOverlay
+        dropAnimation={null}
+        adjustScale={false}
+        modifiers={DRAG_OVERLAY_MODIFIERS}
+      >
         {draggingTile ? (
-          <div className="draggable-item rounded-xl border border-slate-300 bg-white px-5 py-3 font-serif text-lg tracking-wide shadow-2xl scale-105 transform">
+          <div
+            className={`${DRAG_TILE_SURFACE_CLASS} border-slate-300 bg-white text-slate-800 shadow-sm`}
+          >
             {draggingTile.word}
           </div>
         ) : null}

@@ -1,4 +1,3 @@
-import { motion } from 'framer-motion'
 import { Tile } from './Tile'
 import type { TileData, TileStatus } from '../types'
 
@@ -47,10 +46,7 @@ export function Shelf({
         </span>
       </div>
 
-      <motion.div
-        layout
-        className="flex min-h-[72px] flex-wrap items-center justify-center gap-3"
-      >
+      <div className="flex min-h-[72px] flex-wrap items-center justify-center gap-3">
         {visibleTiles.length > 0 ? (
           visibleTiles.map((tile) => (
             <Tile
@@ -70,7 +66,7 @@ export function Shelf({
             Nessuna parola disponibile sulla scaffalatura
           </p>
         )}
-      </motion.div>
+      </div>
     </section>
   )
 }

@@ -110,8 +110,10 @@ export function isVerbAnswerCorrect(
   selected: string,
   expected: string,
 ): boolean {
+  if (!selected?.trim() || !expected?.trim()) return false
+
   return (
-    normalizeVerbAnswer(category, selected) ===
-    normalizeVerbAnswer(category, expected)
+    normalizeVerbAnswer(category, selected).toLowerCase() ===
+    normalizeVerbAnswer(category, expected).toLowerCase()
   )
 }

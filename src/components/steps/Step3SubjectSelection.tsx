@@ -12,6 +12,11 @@ import {
   DROP_ZONE_IDS,
   SUBJECT_ERROR_MESSAGES,
 } from '../../constants/dropZones'
+import {
+  DRAG_MEASURING,
+  DRAG_OVERLAY_MODIFIERS,
+  DRAG_TILE_SURFACE_CLASS,
+} from '../../constants/dragAndDrop'
 import { useDragSensors } from '../../hooks/useDragSensors'
 import type { LatinAnalysis, TileData } from '../../types'
 import { areWordSetsEqual, buildTilesFromWords } from '../../utils/tiles'
@@ -76,6 +81,7 @@ export function Step3SubjectSelection({
 
   const handleDragEnd = useCallback(
     (event: DragEndEvent) => {
+      console.log('[DEBUG DROP] Drop completato. event.over:', event.over)
       setDraggingTileId(null)
 
       if (implicitSuccess) return
@@ -145,6 +151,7 @@ export function Step3SubjectSelection({
   return (
     <DndContext
       sensors={sensors}
+      measuring={DRAG_MEASURING}
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
     >
@@ -212,9 +219,15 @@ export function Step3SubjectSelection({
         </div>
       </div>
 
-      <DragOverlay dropAnimation={null}>
+      <DragOverlay
+        dropAnimation={null}
+        adjustScale={false}
+        modifiers={DRAG_OVERLAY_MODIFIERS}
+      >
         {draggingTile ? (
-          <div className="draggable-item rounded-xl border border-slate-300 bg-white px-5 py-3 font-serif text-lg tracking-wide shadow-2xl scale-105 transform">
+          <div
+            className={`${DRAG_TILE_SURFACE_CLASS} border-slate-300 bg-white text-slate-800 shadow-sm`}
+          >
             {draggingTile.word}
           </div>
         ) : null}
