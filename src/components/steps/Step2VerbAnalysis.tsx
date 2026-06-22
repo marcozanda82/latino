@@ -56,6 +56,7 @@ function ChipButton({
       type="button"
       layout
       disabled={isLocked}
+      whileTap={isLocked ? undefined : { scale: 0.97 }}
       onClick={() => onSelect(category, label)}
       animate={
         isShaking
@@ -73,7 +74,7 @@ function ChipButton({
           ? 'border-emerald-500 bg-emerald-500 text-white shadow-sm shadow-emerald-200'
           : isError
             ? 'border-red-300 bg-red-50 text-red-700'
-            : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50',
+            : 'border-slate-200 bg-white text-slate-700 can-hover:hover:border-slate-300 can-hover:hover:bg-slate-50',
         isLocked && !isSelected ? 'pointer-events-none opacity-40' : '',
         isLocked && isSelected ? 'cursor-default' : '',
       ]

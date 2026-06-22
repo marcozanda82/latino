@@ -134,7 +134,7 @@ export function Step1VerbSelection({
               type="button"
               onClick={onAdvance}
               disabled={!isComplete}
-              className="rounded-lg bg-slate-800 px-6 py-2.5 text-sm font-medium text-white shadow-sm transition-all hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400"
+              className="rounded-lg bg-slate-800 px-6 py-2.5 text-sm font-medium text-white shadow-sm transition-all can-hover:hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400"
             >
               Avanti
             </button>
@@ -144,7 +144,7 @@ export function Step1VerbSelection({
 
       <DragOverlay dropAnimation={null}>
         {draggingTile ? (
-          <div className="rounded-lg border border-slate-300 bg-white px-4 py-2.5 font-serif text-lg tracking-wide shadow-lg">
+          <div className="touch-none rounded-lg border border-slate-300 bg-white px-4 py-2.5 font-serif text-lg tracking-wide shadow-lg">
             {draggingTile.word}
           </div>
         ) : null}

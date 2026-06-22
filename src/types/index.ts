@@ -5,12 +5,14 @@ export interface Step1Verbo {
   spiegazione_errore: string
 }
 
+export type VerbForm = 'attiva' | 'passiva'
+
 export interface Step2AnalisiVerbo {
   modo: string
   tempo: string
   persona: string
   numero: string
-  forma: string
+  forma: VerbForm
 }
 
 export interface Step3Soggetto {

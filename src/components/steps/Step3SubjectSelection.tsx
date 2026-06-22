@@ -171,6 +171,7 @@ export function Step3SubjectSelection({
             type="button"
             layout
             disabled={isComplete}
+            whileTap={isComplete ? undefined : { scale: 0.98 }}
             onClick={handleImplicitClick}
             animate={
               implicitShaking
@@ -186,7 +187,7 @@ export function Step3SubjectSelection({
               'w-full rounded-xl border px-6 py-4 text-sm font-medium transition-colors',
               implicitSuccess
                 ? 'border-emerald-500 bg-emerald-500 text-white shadow-sm shadow-emerald-200'
-                : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50',
+                : 'border-slate-200 bg-white text-slate-700 can-hover:hover:border-slate-300 can-hover:hover:bg-slate-50',
               isComplete && !implicitSuccess
                 ? 'pointer-events-none opacity-40'
                 : '',
@@ -213,7 +214,7 @@ export function Step3SubjectSelection({
 
       <DragOverlay dropAnimation={null}>
         {draggingTile ? (
-          <div className="rounded-lg border border-slate-300 bg-white px-4 py-2.5 font-serif text-lg tracking-wide shadow-lg">
+          <div className="touch-none rounded-lg border border-slate-300 bg-white px-4 py-2.5 font-serif text-lg tracking-wide shadow-lg">
             {draggingTile.word}
           </div>
         ) : null}

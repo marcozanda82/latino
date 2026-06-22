@@ -44,6 +44,7 @@ function CaseChip({
       type="button"
       layout
       disabled={isLocked}
+      whileTap={isLocked ? undefined : { scale: 0.97 }}
       onClick={() => onSelect(caseValue)}
       animate={
         isShaking
@@ -60,8 +61,8 @@ function CaseChip({
         isSelected
           ? 'border-emerald-500 bg-emerald-500 text-white shadow-sm shadow-emerald-200'
           : variant === 'subordinate'
-            ? 'border-indigo-200 bg-indigo-50 text-indigo-700 hover:border-indigo-300 hover:bg-indigo-100'
-            : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50',
+            ? 'border-indigo-200 bg-indigo-50 text-indigo-700 can-hover:hover:border-indigo-300 can-hover:hover:bg-indigo-100'
+            : 'border-slate-200 bg-white text-slate-700 can-hover:hover:border-slate-300 can-hover:hover:bg-slate-50',
         isLocked && !isSelected ? 'pointer-events-none opacity-40' : '',
       ]
         .filter(Boolean)

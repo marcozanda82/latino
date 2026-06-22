@@ -3,7 +3,7 @@ import {
   validateComplementStructure,
   validateComplementsCoherence,
 } from './complements'
-import { isValidModo } from './verbAnalysis'
+import { isValidForm, isValidModo } from './verbAnalysis'
 
 function isTranslationValue(value: unknown): value is TranslationValue {
   if (typeof value === 'string') return true
@@ -47,6 +47,7 @@ function isLatinAnalysis(value: unknown): value is LatinAnalysis {
     typeof step2.persona === 'string' &&
     typeof step2.numero === 'string' &&
     typeof step2.forma === 'string' &&
+    isValidForm(step2.forma) &&
     typeof step3 === 'object' &&
     step3 !== null &&
     Array.isArray(step3.parole_corrette) &&

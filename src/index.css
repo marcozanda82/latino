@@ -1,6 +1,8 @@
 @import 'tailwindcss';
 @config '../tailwind.config.js';
 
+@custom-variant can-hover (@media (hover: hover) and (pointer: fine));
+
 @theme {
   --font-sans: 'Inter', system-ui, sans-serif;
   --font-serif: 'Cormorant Garamond', 'Times New Roman', serif;
