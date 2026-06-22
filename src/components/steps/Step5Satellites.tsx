@@ -57,13 +57,13 @@ function CaseChip({
           : { type: 'spring', stiffness: 400, damping: 28 }
       }
       className={[
-        'rounded-full border px-4 py-2 text-sm font-medium transition-colors',
+        'relative z-10 rounded-full border px-4 py-2 text-sm font-medium transition-colors',
         isSelected
           ? 'border-emerald-500 bg-emerald-500 text-white shadow-sm shadow-emerald-200'
           : variant === 'subordinate'
             ? 'border-indigo-200 bg-indigo-50 text-indigo-700 can-hover:hover:border-indigo-300 can-hover:hover:bg-indigo-100'
             : 'border-slate-200 bg-white text-slate-700 can-hover:hover:border-slate-300 can-hover:hover:bg-slate-50',
-        isLocked && !isSelected ? 'pointer-events-none opacity-40' : '',
+        isLocked && !isSelected ? 'pointer-events-none opacity-40' : 'cursor-pointer',
       ]
         .filter(Boolean)
         .join(' ')}
@@ -169,7 +169,7 @@ export function Step5Satellites({
         <h3 className="mb-4 text-sm font-semibold text-slate-700">
           Che caso è?
         </h3>
-        <div className="flex flex-wrap gap-2.5">
+        <div className="relative z-10 flex flex-wrap gap-2.5">
           {VALID_CASES.map((caseValue) => (
             <CaseChip
               key={caseValue}

@@ -184,7 +184,7 @@ export function Step3SubjectSelection({
                 : { type: 'spring', stiffness: 320, damping: 26 }
             }
             className={[
-              'w-full rounded-xl border px-6 py-4 text-sm font-medium transition-colors',
+              'relative z-10 w-full cursor-pointer rounded-xl border px-6 py-4 text-sm font-medium transition-colors',
               implicitSuccess
                 ? 'border-emerald-500 bg-emerald-500 text-white shadow-sm shadow-emerald-200'
                 : 'border-slate-200 bg-white text-slate-700 can-hover:hover:border-slate-300 can-hover:hover:bg-slate-50',
@@ -214,7 +214,7 @@ export function Step3SubjectSelection({
 
       <DragOverlay dropAnimation={null}>
         {draggingTile ? (
-          <div className="touch-none rounded-lg border border-slate-300 bg-white px-4 py-2.5 font-serif text-lg tracking-wide shadow-lg">
+          <div className="draggable-item rounded-lg border border-slate-300 bg-white px-4 py-2.5 font-serif text-lg tracking-wide shadow-lg">
             {draggingTile.word}
           </div>
         ) : null}

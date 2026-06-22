@@ -92,7 +92,7 @@ export function SelfAssessmentTranslation({
           type="button"
           onClick={handleVerify}
           disabled={!translation.trim()}
-          className="rounded-lg bg-slate-800 px-6 py-3 text-sm font-medium text-white shadow-sm transition-all hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400"
+          className="cursor-pointer rounded-lg bg-slate-800 px-6 py-3 text-sm font-medium text-white shadow-sm transition-all can-hover:hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400"
         >
           Verifica Traduzione
         </button>
@@ -147,14 +147,14 @@ export function SelfAssessmentTranslation({
                   <button
                     type="button"
                     onClick={handleRetry}
-                    className="rounded-lg border border-slate-300 bg-white px-5 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:border-slate-400 hover:bg-slate-50"
+                    className="cursor-pointer rounded-lg border border-slate-300 bg-white px-5 py-2.5 text-sm font-medium text-slate-700 transition-colors can-hover:hover:border-slate-400 can-hover:hover:bg-slate-50"
                   >
                     No, riprovo
                   </button>
                   <button
                     type="button"
                     onClick={handleConfirm}
-                    className="rounded-lg border border-emerald-500 bg-emerald-500 px-5 py-2.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-emerald-600"
+                    className="cursor-pointer rounded-lg border border-emerald-500 bg-emerald-500 px-5 py-2.5 text-sm font-medium text-white shadow-sm transition-colors can-hover:hover:bg-emerald-600"
                   >
                     Sì, è corretta
                   </button>

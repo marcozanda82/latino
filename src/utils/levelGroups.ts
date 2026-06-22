@@ -46,7 +46,10 @@ export function isLevelUnlockedByEvaluation(
   globalIndex: number,
   orderedLevels: Level[],
   evaluationsByFrase: Record<string, unknown>,
+  groupIndex: number,
 ): boolean {
+  if (groupIndex === 0) return true
+
   if (globalIndex === 0) return true
 
   const previousLevel = orderedLevels[globalIndex - 1]

@@ -54,7 +54,6 @@ function ChipButton({
   return (
     <motion.button
       type="button"
-      layout
       disabled={isLocked}
       whileTap={isLocked ? undefined : { scale: 0.97 }}
       onClick={() => onSelect(category, label)}
@@ -69,14 +68,14 @@ function ChipButton({
           : { type: 'spring', stiffness: 400, damping: 28 }
       }
       className={[
-        'rounded-full border px-4 py-2 text-sm font-medium transition-colors',
+        'relative z-10 touch-manipulation rounded-full border px-4 py-2 text-sm font-medium transition-colors',
         isSelected
           ? 'border-emerald-500 bg-emerald-500 text-white shadow-sm shadow-emerald-200'
           : isError
             ? 'border-red-300 bg-red-50 text-red-700'
             : 'border-slate-200 bg-white text-slate-700 can-hover:hover:border-slate-300 can-hover:hover:bg-slate-50',
         isLocked && !isSelected ? 'pointer-events-none opacity-40' : '',
-        isLocked && isSelected ? 'cursor-default' : '',
+        isLocked && isSelected ? 'cursor-default' : 'cursor-pointer',
       ]
         .filter(Boolean)
         .join(' ')}
@@ -188,7 +187,7 @@ export function Step2VerbAnalysis({
             <section
               key={category}
               className={[
-                'rounded-xl border bg-white p-5',
+                'relative isolate rounded-xl border bg-white p-5',
                 isSkippedForInfinito
                   ? 'border-slate-100 bg-slate-50/80'
                   : 'border-slate-200',
@@ -205,7 +204,7 @@ export function Step2VerbAnalysis({
                 )}
               </div>
 
-              <div className="flex flex-wrap gap-2.5">
+              <div className="relative z-10 flex flex-wrap gap-2.5">
                 {VERB_CATEGORY_OPTIONS[category].map((option) => {
                   const chipKey = `${category}-${option}`
                   const isSelected = selected === option

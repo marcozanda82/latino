@@ -394,7 +394,7 @@ export function LatinTranslator({
                       type="button"
                       onClick={handleSubmitToTutor}
                       disabled={isSubmitting || !studentFullTranslation.trim()}
-                      className="rounded-lg border border-sky-600 bg-sky-600 px-8 py-3 text-sm font-medium text-white shadow-sm transition-all hover:bg-sky-700 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-200 disabled:text-slate-400"
+                      className="cursor-pointer rounded-lg border border-sky-600 bg-sky-600 px-8 py-3 text-sm font-medium text-white shadow-sm transition-all can-hover:hover:bg-sky-700 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-200 disabled:text-slate-400"
                     >
                       {isSubmitting ? 'Invio in corso…' : 'Invia per la correzione'}
                     </button>
@@ -414,7 +414,7 @@ export function LatinTranslator({
                   <button
                     type="button"
                     onClick={onBackToLevels}
-                    className="rounded-lg bg-slate-800 px-8 py-3 text-sm font-medium text-white shadow-sm transition-all hover:bg-slate-700"
+                    className="cursor-pointer rounded-lg bg-slate-800 px-8 py-3 text-sm font-medium text-white shadow-sm transition-all can-hover:hover:bg-slate-700"
                   >
                     Torna ai Livelli
                   </button>
@@ -433,7 +433,7 @@ export function LatinTranslator({
                 type="button"
                 onClick={handleAvanti}
                 disabled={!isAvantiEnabled}
-                className="rounded-lg bg-slate-800 px-6 py-2.5 text-sm font-medium text-white shadow-sm transition-all hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400"
+                className="cursor-pointer rounded-lg bg-slate-800 px-6 py-2.5 text-sm font-medium text-white shadow-sm transition-all can-hover:hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400"
               >
                 Avanti
               </button>

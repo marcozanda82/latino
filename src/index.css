@@ -24,14 +24,29 @@ body,
   overflow-x: hidden;
 }
 
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
 body {
   margin: 0;
   min-height: 100svh;
   font-family: var(--font-sans);
   color: var(--color-ink-muted);
   background-color: var(--color-surface);
+  overscroll-behavior-y: none; /* Previene il pull-to-refresh su Android */
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+button {
+  touch-action: manipulation;
+}
+
+.draggable-item {
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 @utility glass-card {

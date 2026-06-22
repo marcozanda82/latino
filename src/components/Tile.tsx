@@ -52,10 +52,10 @@ export function Tile({ id, word, status, disabled = false }: TileProps) {
             : { type: 'spring', stiffness: 320, damping: 26 }
       }
       className={[
-        'touch-none select-none rounded-xl border px-5 py-3 font-serif text-lg tracking-wide transition-shadow',
+        'draggable-item relative z-10 rounded-xl border px-5 py-3 font-serif text-lg tracking-wide transition-shadow',
         isDragging
           ? 'z-20 cursor-grabbing border-slate-300 bg-white shadow-lift'
-          : 'cursor-grab shadow-sm',
+          : 'cursor-pointer shadow-sm',
         isPlaced
           ? 'border-emerald-400 bg-emerald-50 text-emerald-800 shadow-emerald-100'
           : 'border-slate-200 bg-white/90 text-slate-800 can-hover:hover:border-slate-300 can-hover:hover:shadow-md',
