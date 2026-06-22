@@ -51,12 +51,19 @@ function ChipButton({
   isError,
   onSelect,
 }: ChipButtonProps) {
+  const handleSelect = () => onSelect(category, label)
+
   return (
     <motion.button
       type="button"
       disabled={isLocked}
       whileTap={isLocked ? undefined : { scale: 0.97 }}
-      onClick={() => onSelect(category, label)}
+      onClick={handleSelect}
+      onPointerDown={(e) => {
+        if (isLocked) return
+        e.preventDefault()
+        handleSelect()
+      }}
       animate={
         isShaking
           ? { x: [0, -8, 8, -6, 6, -3, 3, 0] }
@@ -68,7 +75,7 @@ function ChipButton({
           : { type: 'spring', stiffness: 400, damping: 28 }
       }
       className={[
-        'relative z-10 touch-manipulation rounded-full border px-4 py-2 text-sm font-medium transition-colors',
+        'relative z-50 pointer-events-auto touch-manipulation rounded-full border px-4 py-2 text-sm font-medium transition-colors',
         isSelected
           ? 'border-emerald-500 bg-emerald-500 text-white shadow-sm shadow-emerald-200'
           : isError
@@ -204,7 +211,7 @@ export function Step2VerbAnalysis({
                 )}
               </div>
 
-              <div className="relative z-10 flex flex-wrap gap-2.5">
+              <div className="relative z-20 pointer-events-auto flex flex-wrap gap-2.5">
                 {VERB_CATEGORY_OPTIONS[category].map((option) => {
                   const chipKey = `${category}-${option}`
                   const isSelected = selected === option
