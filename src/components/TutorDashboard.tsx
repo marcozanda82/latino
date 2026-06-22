@@ -4,6 +4,7 @@ import type { EvaluationStatus, PendingTranslation } from '../types/evaluation'
 
 interface TutorDashboardProps {
   pendingTranslations: PendingTranslation[]
+  evaluatingId?: string | null
   onEvaluate: (
     id: string,
     status: EvaluationStatus,
@@ -71,8 +72,10 @@ const EVALUATION_ACTIONS: Array<{
 
 export function TutorDashboard({
   pendingTranslations,
+  evaluatingId = null,
   onEvaluate,
 }: TutorDashboardProps) {
+  const isSubmitting = evaluatingId !== null
   const awaitingCount = pendingTranslations.filter(
     (item) => item.status === 'in_attesa',
   ).length
@@ -189,17 +192,26 @@ export function TutorDashboard({
                         <button
                           key={action.status}
                           type="button"
-                          onClick={() =>
+                          aria-disabled={isSubmitting}
+                          onClick={(e) => {
+                            e.preventDefault()
+                            if (isSubmitting) return
                             onEvaluate(
                               item.id,
                               action.status,
                               action.bonusScore,
                               item.mechanicalScore,
                             )
-                          }
-                          className={`rounded-lg border px-4 py-2.5 text-sm font-medium shadow-sm transition-colors ${action.className}`}
+                          }}
+                          className={[
+                            'relative z-10 min-h-11 cursor-pointer touch-manipulation rounded-lg border px-4 py-2.5 text-sm font-medium shadow-sm transition-colors can-hover:hover:opacity-90',
+                            action.className,
+                            isSubmitting ? 'pointer-events-none opacity-50' : '',
+                          ]
+                            .filter(Boolean)
+                            .join(' ')}
                         >
-                          {action.label}
+                          {evaluatingId === item.id ? 'Salvataggio...' : action.label}
                         </button>
                       ))}
                     </div>

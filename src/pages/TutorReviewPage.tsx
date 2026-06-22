@@ -25,9 +25,13 @@ const STATUS_SUCCESS_LABELS: Record<
 export function TutorReviewPage() {
   const navigate = useNavigate()
   const [pending, setPending] = useState<PendingTranslation[]>([])
+  const [evaluatingId, setEvaluatingId] = useState<string | null>(null)
 
   useEffect(() => {
-    const unsubscribe = subscribeToPendingEvaluations(setPending)
+    const unsubscribe = subscribeToPendingEvaluations((frasi) => {
+      console.log('[TUTOR DEBUG] Frasi caricate nel dashboard:', frasi)
+      setPending(frasi)
+    })
     return unsubscribe
   }, [])
 
@@ -38,9 +42,11 @@ export function TutorReviewPage() {
       bonusScore: number,
       mechanicalScore: number,
     ) => {
-      if (status === 'in_attesa') return
+      if (status === 'in_attesa' || evaluatingId) return
 
       const totalScore = mechanicalScore + bonusScore
+
+      setEvaluatingId(id)
 
       try {
         await updateEvaluationStatus(id, status, bonusScore, totalScore)
@@ -50,9 +56,11 @@ export function TutorReviewPage() {
       } catch (error) {
         console.error('[TutorReviewPage] handleEvaluate failed:', error)
         showError('Impossibile salvare la valutazione. Riprova.')
+      } finally {
+        setEvaluatingId(null)
       }
     },
-    [],
+    [evaluatingId],
   )
 
   const handleExitToStudent = () => {
@@ -86,6 +94,7 @@ export function TutorReviewPage() {
     >
       <TutorDashboard
         pendingTranslations={pending}
+        evaluatingId={evaluatingId}
         onEvaluate={handleEvaluate}
       />
     </AppLayout>

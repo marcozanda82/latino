@@ -7,8 +7,8 @@ import {
   query,
   serverTimestamp,
   updateDoc,
-  where,
 } from 'firebase/firestore'
+import type { Timestamp } from 'firebase/firestore'
 import type {
   EvaluationStatus,
   PendingTranslation,
@@ -16,21 +16,44 @@ import type {
 import { db } from '../config/firebase'
 
 const EVALUATIONS_COLLECTION = 'evaluations'
+const PENDING_STATUS: EvaluationStatus = 'in_attesa'
+
+function normalizeStatus(value: unknown): EvaluationStatus | null {
+  if (typeof value !== 'string') return null
+  const normalized = value.trim().toLowerCase()
+  if (
+    normalized === 'in_attesa' ||
+    normalized === 'verde' ||
+    normalized === 'giallo' ||
+    normalized === 'rosso'
+  ) {
+    return normalized
+  }
+  return null
+}
+
+function normalizeMechanicalScore(value: unknown): number | null {
+  const score = typeof value === 'number' ? value : Number(value)
+  return Number.isFinite(score) ? score : null
+}
 
 function mapDocToPendingTranslation(
   id: string,
   data: Record<string, unknown>,
 ): PendingTranslation | null {
+  const status = normalizeStatus(data.status)
+  const mechanicalScore = normalizeMechanicalScore(data.mechanicalScore)
+
   if (
     typeof data.fraseOriginale !== 'string' ||
     typeof data.traduzioneAttesa !== 'string' ||
     typeof data.traduzioneStudente !== 'string' ||
-    typeof data.status !== 'string' ||
-    typeof data.mechanicalScore !== 'number'
+    !status ||
+    mechanicalScore === null
   ) {
     console.error(
       '[firebaseEvaluations] Documento ignorato: campi mancanti o non validi.',
-      { id },
+      { id, status: data.status },
     )
     return null
   }
@@ -40,12 +63,13 @@ function mapDocToPendingTranslation(
     fraseOriginale: data.fraseOriginale,
     traduzioneAttesa: data.traduzioneAttesa,
     traduzioneStudente: data.traduzioneStudente,
-    mechanicalScore: data.mechanicalScore,
+    mechanicalScore,
     bonusScore:
       typeof data.bonusScore === 'number' ? data.bonusScore : undefined,
     totalScore:
       typeof data.totalScore === 'number' ? data.totalScore : undefined,
-    status: data.status as EvaluationStatus,
+    status,
+    createdAt: data.createdAt as Timestamp | undefined,
   }
 }
 
@@ -58,7 +82,7 @@ export async function submitTranslationForReview(
       traduzioneAttesa: data.traduzioneAttesa,
       traduzioneStudente: data.traduzioneStudente,
       mechanicalScore: data.mechanicalScore,
-      status: 'in_attesa',
+      status: PENDING_STATUS,
       createdAt: serverTimestamp(),
     })
 
@@ -77,8 +101,7 @@ export function subscribeToPendingEvaluations(
 ): () => void {
   const evaluationsQuery = query(
     collection(db, EVALUATIONS_COLLECTION),
-    where('status', '==', 'in_attesa'),
-    orderBy('createdAt', 'asc'),
+    orderBy('createdAt', 'desc'),
   )
 
   return onSnapshot(
@@ -89,6 +112,12 @@ export function subscribeToPendingEvaluations(
           mapDocToPendingTranslation(docSnap.id, docSnap.data()),
         )
         .filter((item): item is PendingTranslation => item !== null)
+        .filter((item) => item.status === PENDING_STATUS)
+        .sort((a, b) => {
+          const aTime = a.createdAt?.toMillis?.() ?? 0
+          const bTime = b.createdAt?.toMillis?.() ?? 0
+          return aTime - bTime
+        })
 
       callback(items)
     },
@@ -137,6 +166,10 @@ export async function updateEvaluationStatus(
   bonusScore: number,
   totalScore: number,
 ): Promise<void> {
+  if (!id.trim()) {
+    throw new Error('ID valutazione mancante.')
+  }
+
   try {
     await updateDoc(doc(db, EVALUATIONS_COLLECTION, id), {
       status: newStatus,
