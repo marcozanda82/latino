@@ -51,18 +51,15 @@ function ChipButton({
   isError,
   onSelect,
 }: ChipButtonProps) {
-  const handleSelect = () => onSelect(category, label)
-
   return (
     <motion.button
       type="button"
       disabled={isLocked}
       whileTap={isLocked ? undefined : { scale: 0.97 }}
-      onClick={handleSelect}
-      onPointerDown={(e) => {
-        if (isLocked) return
-        e.preventDefault()
-        handleSelect()
+      onTap={() => {
+        if (!isLocked) {
+          onSelect(category, label)
+        }
       }}
       animate={
         isShaking
