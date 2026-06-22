@@ -42,6 +42,21 @@ export function isGroupUnlocked(
   return previousGroup.levels.every((level) => progress[level.id] !== undefined)
 }
 
+export function isLevelUnlockedByEvaluation(
+  globalIndex: number,
+  orderedLevels: Level[],
+  evaluationsByFrase: Record<string, unknown>,
+): boolean {
+  if (globalIndex === 0) return true
+
+  const previousLevel = orderedLevels[globalIndex - 1]
+  if (!previousLevel) return false
+
+  return (
+    evaluationsByFrase[previousLevel.analysis.frase_originale] !== undefined
+  )
+}
+
 export function getExistingGroupNames(levels: Level[]): string[] {
   const names = new Set<string>()
   for (const level of levels) {

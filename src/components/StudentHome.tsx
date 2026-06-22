@@ -19,7 +19,7 @@ import {
 } from '../services/settingsService'
 import {
   groupLevelsByName,
-  isGroupUnlocked,
+  isLevelUnlockedByEvaluation,
 } from '../utils/levelGroups'
 import {
   subscribeToStudentEvaluations,
@@ -89,6 +89,11 @@ export function StudentHome() {
   }, [evaluations])
 
   const groupedLevels = useMemo(() => groupLevelsByName(levels), [levels])
+
+  const flatLevels = useMemo(
+    () => groupedLevels.flatMap((group) => group.levels),
+    [groupedLevels],
+  )
 
   const refreshProgress = useCallback(() => {
     setProgress(getCompletedLevels())
@@ -176,7 +181,14 @@ export function StudentHome() {
       ) : (
         <div className="space-y-12">
           {groupedLevels.map((group, groupIndex) => {
-            const unlocked = isGroupUnlocked(groupIndex, groupedLevels, progress)
+            const groupStartIndex = groupedLevels
+              .slice(0, groupIndex)
+              .reduce((sum, item) => sum + item.levels.length, 0)
+            const isGroupReachable = isLevelUnlockedByEvaluation(
+              groupStartIndex,
+              flatLevels,
+              evaluationsMap,
+            )
 
             return (
               <section key={group.groupName}>
@@ -184,29 +196,35 @@ export function StudentHome() {
                   <h2 className="font-serif text-xl font-semibold text-slate-800 sm:text-2xl">
                     {group.groupName}
                   </h2>
-                  {!unlocked && (
+                  {!isGroupReachable && (
                     <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600">
                       🔒 Bloccato
                     </span>
                   )}
                 </div>
 
-                {!unlocked && (
+                {!isGroupReachable && (
                   <p className="mb-5 text-sm leading-relaxed text-slate-600">
-                    Completa tutti i livelli del mondo precedente per sbloccare
-                    questo gruppo.
+                    Invia la traduzione del livello precedente per sbloccare i
+                    prossimi esercizi.
                   </p>
                 )}
 
                 <div className="grid gap-5 sm:grid-cols-2">
                   {group.levels.map((level, index) => {
+                    const globalIndex = groupStartIndex + index
+                    const isLevelUnlocked = isLevelUnlockedByEvaluation(
+                      globalIndex,
+                      flatLevels,
+                      evaluationsMap,
+                    )
                     const entry = progress[level.id]
                     const bestScore = entry?.bestScore
                     const isCompleted = bestScore !== undefined
                     const evalData =
                       evaluationsMap[level.analysis.frase_originale]
                     const isAwaitingTutor = evalData?.status === 'in_attesa'
-                    const isPlayable = unlocked && !isAwaitingTutor
+                    const isPlayable = isLevelUnlocked && !isAwaitingTutor
 
                     const cardContent = (
                       <>
@@ -216,7 +234,7 @@ export function StudentHome() {
                           </p>
                           <div className="flex shrink-0 flex-col items-end gap-2">
                             {evalData && <EvaluationBadge evalData={evalData} />}
-                            {!unlocked ? (
+                            {!isLevelUnlocked ? (
                               <span className="text-xs text-slate-500">🔒</span>
                             ) : isCompleted && !evalData ? (
                               <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-medium text-emerald-700">
@@ -232,7 +250,7 @@ export function StudentHome() {
                           « {level.analysis.frase_originale} »
                         </p>
                         <p className="mt-5 text-xs font-medium text-emerald-700">
-                          {!unlocked ? (
+                          {!isLevelUnlocked ? (
                             <span className="text-slate-500">Bloccato</span>
                           ) : isAwaitingTutor ? (
                             <span className="text-sky-700">
