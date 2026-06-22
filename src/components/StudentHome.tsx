@@ -8,9 +8,7 @@ import { WeeklyGoalTracker } from './WeeklyGoalTracker'
 import { GlassCard } from './ui/GlassCard'
 import { StudentHomeSkeleton } from './ui/Skeletons'
 import {
-  getCompletedLevels,
   getWeeklyCompletionCount,
-  type LevelProgress,
 } from '../services/progressService'
 import {
   DEFAULT_GAMIFICATION_SETTINGS,
@@ -21,62 +19,34 @@ import {
   groupLevelsByName,
   isLevelUnlockedByEvaluation,
 } from '../utils/levelGroups'
-import {
-  subscribeToStudentEvaluations,
-} from '../services/firebaseEvaluations'
+import { subscribeToStudentEvaluations } from '../services/firebaseEvaluations'
 import type { PendingTranslation } from '../types/evaluation'
+import { calculateMaxSesterziReward } from '../utils/gamification'
+import {
+  buildEvaluationByLevelId,
+  filterLevelsWithoutSubmission,
+  getSubmittedLevelIds,
+} from '../utils/studentEvaluations'
 import { useStudentBalance } from '../hooks/useStudentBalance'
 import { RewardsShop } from './RewardsShop'
+import { StudentBankStatement } from './StudentBankStatement'
+import { StudentArchive } from './StudentArchive'
 
-type StudentTab = 'livelli' | 'negozio'
+type StudentTab = 'livelli' | 'negozio' | 'estratti' | 'archivio'
 
 const TAB_LABELS: Record<StudentTab, string> = {
   livelli: 'Livelli',
   negozio: 'Negozio Premi',
+  estratti: 'Estratto Conto',
+  archivio: 'Archivio',
 }
 
 const HIDDEN_ACTION_CLICKS = 5
 const HIDDEN_ACTION_RESET_MS = 2000
 
-function EvaluationBadge({ evalData }: { evalData: PendingTranslation }) {
-  switch (evalData.status) {
-    case 'in_attesa':
-      return (
-        <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-sky-200/80 bg-sky-50/90 px-2.5 py-1 text-xs font-medium text-sky-800">
-          <span aria-hidden>⏳</span>
-          In attesa del tutor
-        </span>
-      )
-    case 'verde':
-      return (
-        <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-emerald-200/80 bg-emerald-50/90 px-2.5 py-1 text-xs font-semibold tabular-nums text-emerald-800">
-          <span aria-hidden>🟢</span>
-          {evalData.totalScore ?? evalData.mechanicalScore}/100
-        </span>
-      )
-    case 'giallo':
-      return (
-        <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-amber-200/80 bg-amber-50/90 px-2.5 py-1 text-xs font-semibold tabular-nums text-amber-900">
-          <span aria-hidden>🟡</span>
-          {evalData.totalScore ?? evalData.mechanicalScore}/100
-        </span>
-      )
-    case 'rosso':
-      return (
-        <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-rose-200/80 bg-rose-50/90 px-2.5 py-1 text-xs font-semibold tabular-nums text-rose-800">
-          <span aria-hidden>🔴</span>
-          {evalData.totalScore ?? evalData.mechanicalScore}/100
-        </span>
-      )
-    default:
-      return null
-  }
-}
-
 export function StudentHome() {
   const navigate = useNavigate()
   const { levels, loading } = useExercises()
-  const [progress, setProgress] = useState<LevelProgress>({})
   const [weeklyCount, setWeeklyCount] = useState(0)
   const [settings, setSettings] = useState<GamificationSettings>(
     DEFAULT_GAMIFICATION_SETTINGS,
@@ -87,27 +57,40 @@ export function StudentHome() {
   const [activeTab, setActiveTab] = useState<StudentTab>('livelli')
   const { balance } = useStudentBalance()
 
-  const evaluationsMap = useMemo(() => {
-    const map: Record<string, PendingTranslation> = {}
+  const evaluationsByLevelId = useMemo(
+    () => buildEvaluationByLevelId(evaluations, levels),
+    [evaluations, levels],
+  )
 
-    evaluations.forEach((evaluation) => {
-      if (!map[evaluation.fraseOriginale]) {
-        map[evaluation.fraseOriginale] = evaluation
-      }
-    })
+  const submittedLevelIds = useMemo(
+    () => getSubmittedLevelIds(evaluations, levels),
+    [evaluations, levels],
+  )
 
-    return map
-  }, [evaluations])
+  const availableLevels = useMemo(
+    () => filterLevelsWithoutSubmission(levels, submittedLevelIds),
+    [levels, submittedLevelIds],
+  )
 
-  const groupedLevels = useMemo(() => groupLevelsByName(levels), [levels])
+  const allGroupedLevels = useMemo(() => groupLevelsByName(levels), [levels])
 
-  const flatLevels = useMemo(
-    () => groupedLevels.flatMap((group) => group.levels),
-    [groupedLevels],
+  const allFlatLevels = useMemo(
+    () => allGroupedLevels.flatMap((group) => group.levels),
+    [allGroupedLevels],
+  )
+
+  const groupedLevels = useMemo(
+    () =>
+      allGroupedLevels
+        .map((group) => ({
+          ...group,
+          levels: filterLevelsWithoutSubmission(group.levels, submittedLevelIds),
+        }))
+        .filter((group) => group.levels.length > 0),
+    [allGroupedLevels, submittedLevelIds],
   )
 
   const refreshProgress = useCallback(() => {
-    setProgress(getCompletedLevels())
     setWeeklyCount(getWeeklyCompletionCount())
   }, [])
 
@@ -167,8 +150,8 @@ export function StudentHome() {
         </h1>
       </button>
       <p className="mt-2 text-sm leading-relaxed text-slate-600">
-        Ogni livello è un&apos;analisi guidata con punteggio XP e Sesterzi da
-        riscattare nel negozio.
+        Completa gli esercizi disponibili, guadagna Sesterzi e consulta
+        l&apos;archivio per ripassare quelli già inviati.
       </p>
       <p className="mt-4 inline-flex items-center gap-2 rounded-full border border-amber-200/80 bg-amber-50/90 px-4 py-2 text-sm font-semibold tabular-nums text-amber-900">
         <span aria-hidden>🪙</span>
@@ -181,7 +164,7 @@ export function StudentHome() {
     <AppLayout header={header}>
       <GlassCard className="mb-8 !p-2">
         <div className="flex flex-wrap gap-2">
-          {(['livelli', 'negozio'] as StudentTab[]).map((tab) => (
+          {(['livelli', 'negozio', 'estratti', 'archivio'] as StudentTab[]).map((tab) => (
             <button
               key={tab}
               type="button"
@@ -201,167 +184,153 @@ export function StudentHome() {
 
       {activeTab === 'negozio' ? (
         <RewardsShop balance={balance} />
+      ) : activeTab === 'estratti' ? (
+        <StudentBankStatement />
+      ) : activeTab === 'archivio' ? (
+        <StudentArchive />
       ) : (
         <>
-      {!loading && (
-        <WeeklyGoalTracker completedCount={weeklyCount} settings={settings} />
-      )}
+          {!loading && (
+            <WeeklyGoalTracker completedCount={weeklyCount} settings={settings} />
+          )}
 
-      {loading ? (
-        <StudentHomeSkeleton />
-      ) : levels.length === 0 ? (
-        <GlassCard className="py-16 text-center">
-          <p className="text-sm font-medium text-slate-600">
-            Nessun livello disponibile.
-          </p>
-          <p className="mt-2 text-sm text-slate-500">
-            Chiedi al tutor di caricare il primo esercizio.
-          </p>
-        </GlassCard>
-      ) : (
-        <div className="space-y-12">
-          {groupedLevels.map((group, groupIndex) => {
-            const groupStartIndex = groupedLevels
-              .slice(0, groupIndex)
-              .reduce((sum, item) => sum + item.levels.length, 0)
-            const isGroupReachable = isLevelUnlockedByEvaluation(
-              groupStartIndex,
-              flatLevels,
-              evaluationsMap,
-              group.groupName,
-            )
-
-            return (
-              <section key={group.groupName}>
-                <div className="mb-5 flex items-center justify-between gap-3">
-                  <h2 className="font-serif text-xl font-semibold text-slate-800 sm:text-2xl">
-                    {group.groupName}
-                  </h2>
-                  {!isGroupReachable && (
-                    <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600">
-                      🔒 Bloccato
-                    </span>
-                  )}
-                </div>
-
-                {!isGroupReachable && (
-                  <p className="mb-5 text-sm leading-relaxed text-slate-600">
-                    Invia la traduzione del livello precedente per sbloccare i
-                    prossimi esercizi.
-                  </p>
-                )}
-
-                <div className="grid gap-5 sm:grid-cols-2">
-                  {group.levels.map((level, index) => {
-                    const globalIndex = groupStartIndex + index
-                    const isLevelUnlocked = isLevelUnlockedByEvaluation(
-                      globalIndex,
-                      flatLevels,
-                      evaluationsMap,
-                      group.groupName,
+          {loading ? (
+            <StudentHomeSkeleton />
+          ) : levels.length === 0 ? (
+            <GlassCard className="py-16 text-center">
+              <p className="text-sm font-medium text-slate-600">
+                Nessun livello disponibile.
+              </p>
+              <p className="mt-2 text-sm text-slate-500">
+                Chiedi al tutor di caricare il primo esercizio.
+              </p>
+            </GlassCard>
+          ) : availableLevels.length === 0 ? (
+            <GlassCard className="py-16 text-center">
+              <p className="text-sm font-medium text-slate-600">
+                Hai inviato tutti gli esercizi disponibili.
+              </p>
+              <p className="mt-2 text-sm text-slate-500">
+                Consulta la tab Archivio per ripassare le frasi già completate.
+              </p>
+            </GlassCard>
+          ) : (
+            <div className="space-y-12">
+              {groupedLevels.map((group) => {
+                const firstVisibleLevel = group.levels[0]
+                const groupStartIndex = firstVisibleLevel
+                  ? allFlatLevels.findIndex(
+                      (level) => level.id === firstVisibleLevel.id,
                     )
-                    const entry = progress[level.id]
-                    const bestScore = entry?.bestScore
-                    const isCompleted = bestScore !== undefined
-                    const evalData =
-                      evaluationsMap[level.analysis.frase_originale]
-                    const isAwaitingTutor = evalData?.status === 'in_attesa'
-                    const isPlayable = isLevelUnlocked && !isAwaitingTutor
-                    const maxReward =
-                      (level.analysis.parole_array.length * 10) *
-                      (level.analysis.coefficiente || 1.0)
+                  : 0
+                const isGroupReachable = isLevelUnlockedByEvaluation(
+                  groupStartIndex,
+                  allFlatLevels,
+                  evaluationsByLevelId,
+                  group.groupName,
+                )
 
-                    const cardContent = (
-                      <>
-                        <div className="flex items-start justify-between gap-3">
-                          <p className="text-xs font-semibold uppercase tracking-widest text-slate-500">
-                            Livello {index + 1}
-                          </p>
-                          <div className="flex shrink-0 flex-col items-end gap-2">
-                            {evalData && <EvaluationBadge evalData={evalData} />}
-                            {!isLevelUnlocked ? (
-                              <span className="text-xs text-slate-500">🔒</span>
-                            ) : isCompleted && !evalData ? (
-                              <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-medium text-emerald-700">
-                                ✅ Completato
+                return (
+                  <section key={group.groupName}>
+                    <div className="mb-5 flex items-center justify-between gap-3">
+                      <h2 className="font-serif text-xl font-semibold text-slate-800 sm:text-2xl">
+                        {group.groupName}
+                      </h2>
+                      {!isGroupReachable && (
+                        <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600">
+                          🔒 Bloccato
+                        </span>
+                      )}
+                    </div>
+
+                    {!isGroupReachable && (
+                      <p className="mb-5 text-sm leading-relaxed text-slate-600">
+                        Invia la traduzione del livello precedente per sbloccare i
+                        prossimi esercizi.
+                      </p>
+                    )}
+
+                    <div className="grid gap-5 sm:grid-cols-2">
+                      {group.levels.map((level, index) => {
+                        const globalIndex = allFlatLevels.findIndex(
+                          (item) => item.id === level.id,
+                        )
+                        const isLevelUnlocked = isLevelUnlockedByEvaluation(
+                          globalIndex,
+                          allFlatLevels,
+                          evaluationsByLevelId,
+                          group.groupName,
+                        )
+                        const maxReward = calculateMaxSesterziReward(
+                          level.analysis,
+                          level.customMaxReward,
+                        )
+                        const isPlayable = isLevelUnlocked
+
+                        const cardContent = (
+                          <>
+                            <div className="flex items-start justify-between gap-3">
+                              <p className="text-xs font-semibold uppercase tracking-widest text-slate-500">
+                                Livello {index + 1}
+                              </p>
+                              {!isLevelUnlocked ? (
+                                <span className="text-xs text-slate-500">🔒</span>
+                              ) : null}
+                            </div>
+                            <h3 className="mt-3 text-base font-semibold text-slate-800">
+                              {level.title}
+                            </h3>
+                            <p className="mt-2 font-serif text-sm italic leading-relaxed text-slate-600">
+                              « {level.analysis.frase_originale} »
+                            </p>
+                            <p className="mt-3 text-xs font-medium text-slate-600">
+                              Valore massimo:{' '}
+                              <span className="font-bold text-yellow-600">
+                                💰 {maxReward.toLocaleString('it-IT')} Sesterzi
                               </span>
-                            ) : null}
-                          </div>
-                        </div>
-                        <h3 className="mt-3 text-base font-semibold text-slate-800">
-                          {level.title}
-                        </h3>
-                        <p className="mt-2 font-serif text-sm italic leading-relaxed text-slate-600">
-                          « {level.analysis.frase_originale} »
-                        </p>
-                        <p className="mt-3 text-xs font-medium text-slate-600">
-                          Valore massimo:{' '}
-                          <span className="font-bold text-yellow-600">
-                            💰 {maxReward.toLocaleString('it-IT')} Sesterzi
-                          </span>
-                        </p>
-                        <p className="mt-5 text-xs font-medium text-emerald-700">
-                          {!isLevelUnlocked ? (
-                            <span className="text-slate-500">Bloccato</span>
-                          ) : isAwaitingTutor ? (
-                            <span className="text-sky-700">
-                              Valutazione in corso — non puoi ripetere questa
-                              frase
-                            </span>
-                          ) : isCompleted ? (
-                            <>
-                              🏆 Miglior Punteggio: {bestScore} XP
-                              <span className="mt-1 block text-slate-600">
-                                Rigioca
-                              </span>
-                            </>
-                          ) : (
-                            'Inizia'
-                          )}
-                        </p>
-                      </>
-                    )
+                            </p>
+                            <p className="mt-5 text-xs font-medium text-emerald-700">
+                              {!isLevelUnlocked ? (
+                                <span className="text-slate-500">Bloccato</span>
+                              ) : (
+                                'Inizia'
+                              )}
+                            </p>
+                          </>
+                        )
 
-                    const cardClassName = [
-                      'block text-left transition-all duration-200',
-                      isCompleted && !isAwaitingTutor
-                        ? 'border-emerald-200/80 bg-emerald-50/70 hover:border-emerald-300'
-                        : '',
-                      isAwaitingTutor
-                        ? 'cursor-not-allowed opacity-90'
-                        : '',
-                      isPlayable
-                        ? 'hover:-translate-y-0.5 hover:shadow-lift active:scale-[0.98]'
-                        : 'cursor-not-allowed opacity-70',
-                    ]
-                      .filter(Boolean)
-                      .join(' ')
+                        const cardClassName = [
+                          'block text-left transition-all duration-200',
+                          isPlayable
+                            ? 'hover:-translate-y-0.5 hover:shadow-lift active:scale-[0.98]'
+                            : 'cursor-not-allowed opacity-70',
+                        ].join(' ')
 
-                    return (
-                      <motion.div
-                        key={level.id}
-                        initial={{ opacity: 0, y: 12 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: index * 0.05 }}
-                      >
-                        {isPlayable ? (
-                          <Link to={`/play/${level.id}`} className={cardClassName}>
-                            <GlassCard className="!p-6">{cardContent}</GlassCard>
-                          </Link>
-                        ) : (
-                          <GlassCard className="!p-6" as="article">
-                            {cardContent}
-                          </GlassCard>
-                        )}
-                      </motion.div>
-                    )
-                  })}
-                </div>
-              </section>
-            )
-          })}
-        </div>
-      )}
+                        return (
+                          <motion.div
+                            key={level.id}
+                            initial={{ opacity: 0, y: 12 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: index * 0.05 }}
+                          >
+                            {isPlayable ? (
+                              <Link to={`/play/${level.id}`} className={cardClassName}>
+                                <GlassCard className="!p-6">{cardContent}</GlassCard>
+                              </Link>
+                            ) : (
+                              <GlassCard className="!p-6" as="article">
+                                {cardContent}
+                              </GlassCard>
+                            )}
+                          </motion.div>
+                        )
+                      })}
+                    </div>
+                  </section>
+                )
+              })}
+            </div>
+          )}
         </>
       )}
 

@@ -3,18 +3,21 @@ import { GlassCard } from './ui/GlassCard'
 import type { EvaluationStatus, PendingTranslation } from '../types/evaluation'
 
 interface TutorDashboardProps {
-  pendingTranslations: PendingTranslation[]
+  evaluations: PendingTranslation[]
   evaluatingId?: string | null
+  resettingId?: string | null
   onEvaluate: (
     id: string,
     status: EvaluationStatus,
     bonusScore: number,
     mechanicalScore: number,
   ) => void
+  onReset: (id: string, reverseReward: boolean) => void
 }
 
 const STATUS_LABELS: Record<EvaluationStatus, string> = {
   in_attesa: 'In attesa',
+  approved: 'Auto-convalidata',
   verde: 'Corretta',
   giallo: 'Parziale',
   rosso: 'Errata',
@@ -27,6 +30,10 @@ const STATUS_STYLES: Record<
   in_attesa: {
     badge: 'border-slate-200 bg-slate-100 text-slate-600',
     border: 'border-slate-200',
+  },
+  approved: {
+    badge: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+    border: 'border-emerald-200',
   },
   verde: {
     badge: 'border-emerald-200 bg-emerald-50 text-emerald-700',
@@ -71,14 +78,34 @@ const EVALUATION_ACTIONS: Array<{
 ]
 
 export function TutorDashboard({
-  pendingTranslations,
+  evaluations,
   evaluatingId = null,
+  resettingId = null,
   onEvaluate,
+  onReset,
 }: TutorDashboardProps) {
-  const isSubmitting = evaluatingId !== null
-  const awaitingCount = pendingTranslations.filter(
+  const isBusy = evaluatingId !== null || resettingId !== null
+  const awaitingCount = evaluations.filter(
     (item) => item.status === 'in_attesa',
   ).length
+
+  const handleResetClick = (item: PendingTranslation) => {
+    if (isBusy) return
+
+    const confirmed = window.confirm(
+      'Sbloccare questo esercizio? Sparirà dall\'archivio e riapparirà nella Home dello studente.',
+    )
+    if (!confirmed) return
+
+    let reverseReward = false
+    if (typeof item.reward === 'number' && item.reward > 0) {
+      reverseReward = window.confirm(
+        `Vuoi stornare anche i ${item.reward.toLocaleString('it-IT')} Sesterzi guadagnati?`,
+      )
+    }
+
+    onReset(item.id, reverseReward)
+  }
 
   return (
     <section className="flex flex-col gap-6">
@@ -93,24 +120,24 @@ export function TutorDashboard({
           Confronta la traduzione inserita dallo studente con quella attesa
           dall&apos;esercizio e assegna un giudizio.
         </p>
-        {pendingTranslations.length > 0 && (
+        {evaluations.length > 0 && (
           <p className="mt-3 text-sm font-medium text-slate-600">
             {awaitingCount > 0
               ? `${awaitingCount} traduzione${awaitingCount === 1 ? '' : 'i'} da valutare`
-              : 'Tutte le traduzioni sono state valutate.'}
+              : 'Tutte le traduzioni in coda sono state valutate.'}
           </p>
         )}
       </div>
 
-      {pendingTranslations.length === 0 ? (
+      {evaluations.length === 0 ? (
         <GlassCard className="rounded-xl p-8 text-center">
           <p className="text-sm font-medium text-slate-600">
-            Nessuna traduzione in attesa di valutazione.
+            Nessuna valutazione registrata.
           </p>
         </GlassCard>
       ) : (
         <ul className="flex flex-col gap-4">
-          {pendingTranslations.map((item, index) => {
+          {evaluations.map((item, index) => {
             const styles = STATUS_STYLES[item.status]
             const isPending = item.status === 'in_attesa'
 
@@ -203,10 +230,10 @@ export function TutorDashboard({
                         <button
                           key={action.status}
                           type="button"
-                          aria-disabled={isSubmitting}
+                          aria-disabled={isBusy}
                           onClick={(e) => {
                             e.preventDefault()
-                            if (isSubmitting) return
+                            if (isBusy) return
                             onEvaluate(
                               item.id,
                               action.status,
@@ -217,7 +244,7 @@ export function TutorDashboard({
                           className={[
                             'relative z-10 min-h-11 cursor-pointer touch-manipulation rounded-lg border px-4 py-2.5 text-sm font-medium shadow-sm transition-colors can-hover:hover:opacity-90',
                             action.className,
-                            isSubmitting ? 'pointer-events-none opacity-50' : '',
+                            isBusy ? 'pointer-events-none opacity-50' : '',
                           ]
                             .filter(Boolean)
                             .join(' ')}
@@ -255,6 +282,19 @@ export function TutorDashboard({
                       </div>
                     </div>
                   )}
+
+                  <div className="mt-5 border-t border-slate-100 pt-4">
+                    <button
+                      type="button"
+                      onClick={() => handleResetClick(item)}
+                      disabled={isBusy}
+                      className="min-h-10 cursor-pointer rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition-colors can-hover:hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {resettingId === item.id
+                        ? 'Sblocco in corso…'
+                        : 'Sblocca / Reset esercizio'}
+                    </button>
+                  </div>
                 </GlassCard>
               </motion.li>
             )

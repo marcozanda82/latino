@@ -22,6 +22,7 @@ interface FinalReviewPanelProps {
   isSubmitting: boolean
   isSubmitted: boolean
   earnedSesterzi: number | null
+  wasAutoApproved?: boolean
   onEditStep: (step: AppStep) => void
   onSubmit: () => void
   onBackToLevels: () => void
@@ -51,6 +52,7 @@ export function FinalReviewPanel({
   isSubmitting,
   isSubmitted,
   earnedSesterzi,
+  wasAutoApproved = false,
   onEditStep,
   onSubmit,
   onBackToLevels,
@@ -200,8 +202,10 @@ export function FinalReviewPanel({
       ) : (
         <GlassCard className="border border-emerald-200 bg-emerald-50/80 !p-5 text-center">
           <p className="text-sm font-medium text-emerald-900">
-            Compito inviato! Hai protetto {mechanicalScore} punti su 60. Il Tutor
-            valuterà la tua traduzione.
+            {wasAutoApproved
+              ? 'Traduzione perfetta auto-convalidata! Non serve l\'approvazione del Tutor.'
+              : 'Compito inviato! Il Tutor valuterà la tua traduzione.'}{' '}
+            Hai protetto {mechanicalScore} punti su 60.
           </p>
           {earnedSesterzi !== null && earnedSesterzi > 0 ? (
             <p className="mt-3 text-sm font-semibold text-amber-800">

@@ -14,6 +14,8 @@ import {
   updateSettings,
   type GamificationSettings,
 } from '../services/settingsService'
+import { updateLevelCompensation } from '../services/exerciseService'
+import { calculateMaxSesterziReward } from '../utils/gamification'
 import { getExistingGroupNames } from '../utils/levelGroups'
 import { usePendingEvaluations } from '../hooks/usePendingEvaluations'
 import { TutorDashboard } from './TutorDashboard'
@@ -30,7 +32,12 @@ const TAB_LABELS: Record<AdminTab, string> = {
 
 export function AdminDashboard() {
   const navigate = useNavigate()
-  const { levels, loading, saving, addLevel, removeLevel } = useExercises()
+  const { levels, loading, saving, addLevel, removeLevel, refreshLevels } =
+    useExercises()
+  const [compDrafts, setCompDrafts] = useState<
+    Record<string, { coefficient: string; customMaxReward: string }>
+  >({})
+  const [savingCompId, setSavingCompId] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<AdminTab>('esercizi')
   const [pendingAnalysis, setPendingAnalysis] = useState<LatinAnalysis | null>(
     null,
@@ -42,7 +49,7 @@ export function AdminDashboard() {
   )
   const [settingsLoading, setSettingsLoading] = useState(true)
   const [settingsSaving, setSettingsSaving] = useState(false)
-  const { pending, pendingCount, evaluatingId, handleEvaluate } =
+  const { pendingCount, evaluatingId, resettingId, allEvaluations, handleEvaluate, handleReset } =
     usePendingEvaluations()
 
   const existingGroupNames = useMemo(
@@ -55,6 +62,60 @@ export function AdminDashboard() {
       .then(setSettings)
       .finally(() => setSettingsLoading(false))
   }, [])
+
+  useEffect(() => {
+    setCompDrafts(
+      Object.fromEntries(
+        levels.map((level) => [
+          level.id,
+          {
+            coefficient: String(level.analysis.coefficiente ?? 1),
+            customMaxReward:
+              level.customMaxReward !== undefined
+                ? String(level.customMaxReward)
+                : '',
+          },
+        ]),
+      ),
+    )
+  }, [levels])
+
+  const handleSaveCompensation = async (levelId: string) => {
+    const draft = compDrafts[levelId]
+    if (!draft) return
+
+    const coefficient = Number(draft.coefficient)
+    const customMaxReward = draft.customMaxReward.trim()
+      ? Number(draft.customMaxReward)
+      : null
+
+    if (!Number.isFinite(coefficient) || coefficient < 0) {
+      showError('Coefficiente non valido.')
+      return
+    }
+
+    if (
+      customMaxReward !== null &&
+      (!Number.isFinite(customMaxReward) || customMaxReward < 0)
+    ) {
+      showError('Compenso massimo non valido.')
+      return
+    }
+
+    setSavingCompId(levelId)
+    try {
+      await updateLevelCompensation(levelId, {
+        coefficient,
+        customMaxReward,
+      })
+      await refreshLevels()
+      showSuccess('Compenso aggiornato.')
+    } catch {
+      showError('Impossibile aggiornare il compenso.')
+    } finally {
+      setSavingCompId(null)
+    }
+  }
 
   const handleLoad = (analysis: LatinAnalysis) => {
     setPendingAnalysis(analysis)
@@ -163,9 +224,11 @@ export function AdminDashboard() {
       <main className="space-y-8">
         {activeTab === 'valutazioni' && (
           <TutorDashboard
-            pendingTranslations={pending}
+            evaluations={allEvaluations}
             evaluatingId={evaluatingId}
+            resettingId={resettingId}
             onEvaluate={handleEvaluate}
+            onReset={handleReset}
           />
         )}
 
@@ -327,12 +390,28 @@ export function AdminDashboard() {
                 </p>
               ) : (
                 <ul className="mt-5 space-y-4">
-                    {levels.map((level) => (
+                    {levels.map((level) => {
+                      const draft = compDrafts[level.id] ?? {
+                        coefficient: String(level.analysis.coefficiente ?? 1),
+                        customMaxReward:
+                          level.customMaxReward !== undefined
+                            ? String(level.customMaxReward)
+                            : '',
+                      }
+                      const previewMax = calculateMaxSesterziReward(
+                        level.analysis,
+                        draft.customMaxReward.trim()
+                          ? Number(draft.customMaxReward)
+                          : level.customMaxReward,
+                      )
+
+                      return (
                       <li
                         key={level.id}
-                        className="flex items-center justify-between gap-4 rounded-xl border border-slate-100 bg-slate-50 px-4 py-3"
+                        className="rounded-xl border border-slate-100 bg-slate-50 px-4 py-4"
                       >
-                        <div className="min-w-0">
+                        <div className="flex flex-wrap items-start justify-between gap-4">
+                        <div className="min-w-0 flex-1">
                           <p className="truncate text-sm font-medium text-slate-800">
                             {level.title}
                           </p>
@@ -341,6 +420,9 @@ export function AdminDashboard() {
                           </p>
                           <p className="truncate font-serif text-xs italic text-slate-500">
                             {level.analysis.frase_originale}
+                          </p>
+                          <p className="mt-2 text-xs font-medium text-amber-800">
+                            Valore max stimato: {previewMax.toLocaleString('it-IT')} Sesterzi
                           </p>
                         </div>
                         <button
@@ -351,8 +433,66 @@ export function AdminDashboard() {
                         >
                           Elimina
                         </button>
+                        </div>
+
+                        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                          <div>
+                            <label className="block text-xs font-medium text-slate-600">
+                              Coefficiente
+                            </label>
+                            <input
+                              type="number"
+                              min={0}
+                              step={0.1}
+                              value={draft.coefficient}
+                              onChange={(event) =>
+                                setCompDrafts((current) => ({
+                                  ...current,
+                                  [level.id]: {
+                                    ...draft,
+                                    coefficient: event.target.value,
+                                  },
+                                }))
+                              }
+                              className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-slate-400"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-slate-600">
+                              Compenso max fisso (Sesterzi)
+                            </label>
+                            <input
+                              type="number"
+                              min={0}
+                              value={draft.customMaxReward}
+                              placeholder="Opzionale"
+                              onChange={(event) =>
+                                setCompDrafts((current) => ({
+                                  ...current,
+                                  [level.id]: {
+                                    ...draft,
+                                    customMaxReward: event.target.value,
+                                  },
+                                }))
+                              }
+                              className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-slate-400"
+                            />
+                          </div>
+                          <div className="flex items-end">
+                            <button
+                              type="button"
+                              onClick={() => handleSaveCompensation(level.id)}
+                              disabled={savingCompId === level.id}
+                              className="min-h-10 w-full cursor-pointer rounded-lg bg-slate-800 px-4 py-2 text-sm font-medium text-white can-hover:hover:bg-slate-700 disabled:opacity-60"
+                            >
+                              {savingCompId === level.id
+                                ? 'Salvataggio…'
+                                : 'Salva compenso'}
+                            </button>
+                          </div>
+                        </div>
                       </li>
-                    ))}
+                    )})}
                 </ul>
               )}
             </GlassCard>

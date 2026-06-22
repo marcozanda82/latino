@@ -21,7 +21,7 @@ import {
 } from '../utils/gamification'
 import type { LatinAnalysis } from '../types'
 import { saveLevelScore } from '../services/progressService'
-import { submitTranslationForReview } from '../services/firebaseEvaluations'
+import { submitTranslationForReview, canAutoApproveTranslation } from '../services/firebaseEvaluations'
 import {
   getStudentBalanceDocPath,
   getStudentUserId,
@@ -47,6 +47,7 @@ interface LatinTranslatorProps {
   analysis: LatinAnalysis
   levelTitle: string
   levelId?: string
+  customMaxReward?: number
   onBackToLevels: () => void
 }
 
@@ -54,6 +55,7 @@ export function LatinTranslator({
   analysis,
   levelTitle,
   levelId,
+  customMaxReward,
   onBackToLevels,
 }: LatinTranslatorProps) {
   const [currentStep, setCurrentStep] = useState<AppStep>(1)
@@ -70,6 +72,7 @@ export function LatinTranslator({
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isSubmitted, setIsSubmitted] = useState(false)
   const [earnedSesterzi, setEarnedSesterzi] = useState<number | null>(null)
+  const [wasAutoApproved, setWasAutoApproved] = useState(false)
   const [step1Snapshot, setStep1Snapshot] = useState({
     placedTileId: null as string | null,
     isComplete: false,
@@ -166,7 +169,16 @@ export function LatinTranslator({
 
     setIsSubmitting(true)
 
-    const reward = calculateFinalSesterziReward(analysis, mechanicalScore)
+    const reward = calculateFinalSesterziReward(
+      analysis,
+      mechanicalScore,
+      customMaxReward,
+    )
+    const autoApproved = canAutoApproveTranslation(
+      studentFullTranslation,
+      fullTranslation,
+      mechanicalScore,
+    )
     const userId = getStudentUserId()
     const docPath = getStudentBalanceDocPath()
 
@@ -178,6 +190,7 @@ export function LatinTranslator({
       paroleCount: analysis.parole_array.length,
       coefficiente: analysis.coefficiente ?? 1.0,
       studentFullTranslation: studentFullTranslation.trim(),
+      autoApproved,
     })
 
     if (reward === undefined || reward <= 0) {
@@ -188,17 +201,20 @@ export function LatinTranslator({
     }
 
     try {
-      await submitTranslationForReview({
+      const result = await submitTranslationForReview({
+        levelId,
         fraseOriginale: analysis.frase_originale,
         traduzioneAttesa: fullTranslation,
         traduzioneStudente: studentFullTranslation,
         mechanicalScore,
         reward,
+        autoApproved,
       })
       if (levelId) {
         await deleteExerciseDraft(levelId)
       }
       setEarnedSesterzi(reward)
+      setWasAutoApproved(result.autoApproved)
       setIsSubmitted(true)
       setInReview(true)
       setReviewEditStep(null)
@@ -511,6 +527,7 @@ export function LatinTranslator({
               isSubmitting={isSubmitting}
               isSubmitted={isSubmitted}
               earnedSesterzi={earnedSesterzi}
+              wasAutoApproved={wasAutoApproved}
               onEditStep={handleEditFromReview}
               onSubmit={handleSubmitToTutor}
               onBackToLevels={onBackToLevels}

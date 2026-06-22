@@ -16,13 +16,30 @@ export function getMotivationalMessage(score: number): string {
   return 'Puoi fare di meglio!'
 }
 
+export function calculateMaxSesterziReward(
+  analysis: LatinAnalysis,
+  customMaxReward?: number,
+): number {
+  if (
+    typeof customMaxReward === 'number' &&
+    Number.isFinite(customMaxReward) &&
+    customMaxReward >= 0
+  ) {
+    return Math.round(customMaxReward)
+  }
+
+  return Math.round(
+    analysis.parole_array.length * 10 * (analysis.coefficiente ?? 1.0),
+  )
+}
+
 export function calculateFinalSesterziReward(
   analysis: LatinAnalysis,
   mechanicalScore: number,
+  customMaxReward?: number,
   maxMechanicalScore = 60,
 ): number {
-  const base =
-    analysis.parole_array.length * 10 * (analysis.coefficiente ?? 1.0)
+  const base = calculateMaxSesterziReward(analysis, customMaxReward)
   const ratio = Math.max(
     0,
     Math.min(1, mechanicalScore / maxMechanicalScore),

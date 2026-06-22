@@ -22,7 +22,7 @@ export function RewardsShop({ balance }: RewardsShopProps) {
     setPurchasingId(reward.id)
 
     try {
-      await purchaseReward(reward.cost)
+      await purchaseReward(reward.cost, reward.name)
       showSuccess(
         'Premio sbloccato! Mostra questa schermata al Tutor per riscuoterlo.',
       )

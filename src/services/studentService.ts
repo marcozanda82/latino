@@ -4,29 +4,30 @@ import {
   increment,
   onSnapshot,
   runTransaction,
+  serverTimestamp,
   setDoc,
-  updateDoc,
+  writeBatch,
 } from 'firebase/firestore'
 import { db } from '../config/firebase'
+import {
+  createStudentTransactionDocRef,
+  getStudentBalanceDocPath,
+  getStudentDocRef,
+  getStudentTransactionsCollectionRef,
+  getStudentUserId,
+} from './studentFinancePaths'
 
-const USERS_COLLECTION = 'users'
-export const DEFAULT_STUDENT_ID = 'default'
+export const LEGACY_BALANCE_ALIGNMENT_ID = 'legacy-balance-alignment'
+export const LEGACY_BALANCE_DESCRIPTION = 'Saldo precedente (Allineamento)'
 
-export function getStudentUserId(): string {
-  return DEFAULT_STUDENT_ID
-}
-
-/** Percorso Firestore usato sia in lettura che in scrittura del saldo. */
-export function getStudentBalanceDocPath(): string {
-  return `${USERS_COLLECTION}/${getStudentUserId()}`
-}
+export {
+  DEFAULT_STUDENT_ID,
+  getStudentBalanceDocPath,
+  getStudentUserId,
+} from './studentFinancePaths'
 
 export interface StudentProfile {
   balance: number
-}
-
-function getStudentDocRef() {
-  return doc(db, USERS_COLLECTION, DEFAULT_STUDENT_ID)
 }
 
 function normalizeBalance(value: unknown): number {
@@ -58,16 +59,10 @@ export function subscribeToStudentBalance(
   const studentRef = getStudentDocRef()
   const docPath = getStudentBalanceDocPath()
 
-  console.log('[studentService] subscribeToStudentBalance — lettura da:', docPath)
-
   return onSnapshot(
     studentRef,
     (snapshot) => {
       if (!snapshot.exists()) {
-        console.log(
-          '[studentService] subscribeToStudentBalance — documento assente, creazione profilo:',
-          docPath,
-        )
         void ensureStudentProfile().catch((error) => {
           console.error(
             '[studentService] ensureStudentProfile failed during subscribe:',
@@ -78,12 +73,7 @@ export function subscribeToStudentBalance(
         return
       }
 
-      const balance = normalizeBalance(snapshot.data()?.balance)
-      console.log('[studentService] subscribeToStudentBalance — saldo letto:', {
-        docPath,
-        balance,
-      })
-      callback(balance)
+      callback(normalizeBalance(snapshot.data()?.balance))
     },
     (error) => {
       console.error('[studentService] subscribeToStudentBalance failed:', {
@@ -95,38 +85,86 @@ export function subscribeToStudentBalance(
   )
 }
 
-export async function addSesterzi(amount: number): Promise<void> {
-  const userId = getStudentUserId()
-  const docPath = getStudentBalanceDocPath()
+export async function alignLegacyBalanceTransaction(
+  balance: number,
+): Promise<boolean> {
+  if (!Number.isFinite(balance) || balance <= 0) {
+    return false
+  }
 
-  console.log('[studentService] addSesterzi — preparazione incremento:', {
-    userId,
-    docPath,
-    amount,
+  const legacyRef = doc(
+    getStudentTransactionsCollectionRef(),
+    LEGACY_BALANCE_ALIGNMENT_ID,
+  )
+  const existing = await getDoc(legacyRef)
+
+  if (existing.exists()) {
+    return false
+  }
+
+  await setDoc(legacyRef, {
+    amount: balance,
+    type: 'earn',
+    description: LEGACY_BALANCE_DESCRIPTION,
+    timestamp: serverTimestamp(),
   })
 
+  console.log('[studentService] alignLegacyBalanceTransaction OK:', {
+    balance,
+    path: `${getStudentBalanceDocPath()}/transactions/${LEGACY_BALANCE_ALIGNMENT_ID}`,
+  })
+
+  return true
+}
+
+async function commitEarnTransaction(
+  amount: number,
+  description: string,
+): Promise<void> {
+  await ensureStudentProfile()
+
+  const studentRef = getStudentDocRef()
+  const txRef = createStudentTransactionDocRef()
+  const batch = writeBatch(db)
+
+  batch.update(studentRef, {
+    balance: increment(amount),
+  })
+  batch.set(txRef, {
+    amount,
+    type: 'earn',
+    description: description.trim(),
+    timestamp: serverTimestamp(),
+  })
+
+  await batch.commit()
+}
+
+export async function creditSesterzi(
+  amount: number,
+  description: string,
+): Promise<void> {
+  const userId = getStudentUserId()
+
   if (!Number.isFinite(amount) || amount <= 0) {
-    console.warn(
-      '[studentService] addSesterzi — importo non valido, incremento saltato:',
-      amount,
-    )
+    console.warn('[studentService] creditSesterzi — importo non valido:', amount)
     return
   }
 
+  const trimmedDescription =
+    description.trim() || 'Ricompensa per traduzione completata'
+
   try {
-    await ensureStudentProfile()
+    await commitEarnTransaction(amount, trimmedDescription)
 
-    console.log('[studentService] addSesterzi — updateDoc increment su:', docPath)
-
-    await updateDoc(getStudentDocRef(), {
-      balance: increment(amount),
-    })
-
-    console.log('Saldo aggiornato con successo per:', userId, 'Valore:', amount)
-  } catch (error) {
-    console.error('[studentService] addSesterzi failed:', {
+    console.log('[studentService] creditSesterzi OK:', {
       userId,
-      docPath,
+      amount,
+      path: `${getStudentBalanceDocPath()}/transactions`,
+    })
+  } catch (error) {
+    console.error('[studentService] creditSesterzi failed:', {
+      userId,
       amount,
       error,
     })
@@ -134,9 +172,31 @@ export async function addSesterzi(amount: number): Promise<void> {
   }
 }
 
-export async function purchaseReward(cost: number): Promise<void> {
-  if (!Number.isFinite(cost) || cost <= 0) {
-    throw new Error('Costo premio non valido.')
+export async function addSesterzi(amount: number): Promise<void> {
+  if (!Number.isFinite(amount) || amount <= 0) {
+    console.warn('[studentService] addSesterzi — importo non valido:', amount)
+    return
+  }
+
+  try {
+    await commitEarnTransaction(amount, 'Traduzione completata')
+  } catch (error) {
+    console.error('[studentService] addSesterzi failed:', { amount, error })
+    throw error
+  }
+}
+
+export async function debitSesterzi(
+  amount: number,
+  description: string,
+): Promise<void> {
+  if (!Number.isFinite(amount) || amount <= 0) {
+    throw new Error('Importo non valido.')
+  }
+
+  const trimmedDescription = description.trim()
+  if (!trimmedDescription) {
+    throw new Error('Descrizione transazione mancante.')
   }
 
   const studentRef = getStudentDocRef()
@@ -145,18 +205,67 @@ export async function purchaseReward(cost: number): Promise<void> {
     const snapshot = await transaction.get(studentRef)
 
     if (!snapshot.exists()) {
-      transaction.set(studentRef, { balance: 0 })
       throw new Error('Saldo insufficiente.')
     }
 
     const balance = normalizeBalance(snapshot.data()?.balance)
 
-    if (balance < cost) {
+    if (balance < amount) {
       throw new Error('Saldo insufficiente.')
     }
 
     transaction.update(studentRef, {
-      balance: increment(-cost),
+      balance: increment(-amount),
+    })
+
+    transaction.set(createStudentTransactionDocRef(), {
+      amount: -amount,
+      type: 'spend',
+      description: trimmedDescription,
+      timestamp: serverTimestamp(),
     })
   })
 }
+
+export async function reverseSesterziCredit(
+  amount: number,
+  description: string,
+): Promise<void> {
+  if (!Number.isFinite(amount) || amount <= 0) {
+    throw new Error('Importo rettifica non valido.')
+  }
+
+  const studentRef = getStudentDocRef()
+
+  await runTransaction(db, async (transaction) => {
+    const snapshot = await transaction.get(studentRef)
+
+    if (!snapshot.exists()) {
+      throw new Error('Profilo studente non trovato.')
+    }
+
+    transaction.update(studentRef, {
+      balance: increment(-amount),
+    })
+
+    transaction.set(createStudentTransactionDocRef(), {
+      amount: -amount,
+      type: 'earn',
+      description: description.trim(),
+      timestamp: serverTimestamp(),
+    })
+  })
+}
+
+export async function purchaseReward(
+  cost: number,
+  rewardName: string,
+): Promise<void> {
+  if (!Number.isFinite(cost) || cost <= 0) {
+    throw new Error('Costo premio non valido.')
+  }
+
+  await debitSesterzi(cost, `Acquisto premio: ${rewardName}`)
+}
+
+export { getStudentTransactionsCollectionRef } from './studentFinancePaths'

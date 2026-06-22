@@ -6,7 +6,13 @@ import { clearTutorAuthentication } from '../services/tutorAuthService'
 
 export function TutorReviewPage() {
   const navigate = useNavigate()
-  const { pending, evaluatingId, handleEvaluate } = usePendingEvaluations()
+  const {
+    allEvaluations,
+    evaluatingId,
+    resettingId,
+    handleEvaluate,
+    handleReset,
+  } = usePendingEvaluations()
 
   const handleExitToStudent = () => {
     clearTutorAuthentication()
@@ -45,9 +51,11 @@ export function TutorReviewPage() {
       }
     >
       <TutorDashboard
-        pendingTranslations={pending}
+        evaluations={allEvaluations}
         evaluatingId={evaluatingId}
+        resettingId={resettingId}
         onEvaluate={handleEvaluate}
+        onReset={handleReset}
       />
     </AppLayout>
   )

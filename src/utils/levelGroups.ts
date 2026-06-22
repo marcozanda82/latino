@@ -45,7 +45,7 @@ export function isGroupUnlocked(
 export function isLevelUnlockedByEvaluation(
   globalIndex: number,
   orderedLevels: Level[],
-  evaluationsByFrase: Record<string, unknown>,
+  evaluationsByLevelId: Record<string, unknown>,
   groupName: string,
 ): boolean {
   if (groupName.includes('Settimana 1')) return true
@@ -55,9 +55,7 @@ export function isLevelUnlockedByEvaluation(
   const previousLevel = orderedLevels[globalIndex - 1]
   if (!previousLevel) return false
 
-  return (
-    evaluationsByFrase[previousLevel.analysis.frase_originale] !== undefined
-  )
+  return evaluationsByLevelId[previousLevel.id] !== undefined
 }
 
 export function getExistingGroupNames(levels: Level[]): string[] {

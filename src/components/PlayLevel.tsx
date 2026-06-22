@@ -5,6 +5,7 @@ import { AppLayout } from './layout/AppLayout'
 import { PlayLevelSkeleton } from './ui/Skeletons'
 import { GlassCard } from './ui/GlassCard'
 import { fetchLevelById, type Level } from '../services/exerciseService'
+import { subscribeToStudentEvaluations } from '../services/firebaseEvaluations'
 
 export function PlayLevel() {
   const { levelId } = useParams<{ levelId: string }>()
@@ -40,6 +41,24 @@ export function PlayLevel() {
     }
   }, [levelId])
 
+  useEffect(() => {
+    if (!level) return
+
+    const unsubscribe = subscribeToStudentEvaluations((evaluations) => {
+      const alreadySubmitted = evaluations.some(
+        (evaluation) =>
+          evaluation.levelId === level.id ||
+          evaluation.fraseOriginale === level.analysis.frase_originale,
+      )
+
+      if (alreadySubmitted) {
+        navigate('/', { replace: true })
+      }
+    })
+
+    return unsubscribe
+  }, [level, navigate])
+
   if (loading) {
     return <PlayLevelSkeleton />
   }
@@ -65,6 +84,7 @@ export function PlayLevel() {
       analysis={level.analysis}
       levelTitle={level.title}
       levelId={level.id}
+      customMaxReward={level.customMaxReward}
       onBackToLevels={() => navigate('/')}
     />
   )
