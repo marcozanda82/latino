@@ -188,7 +188,7 @@ export function StudentHome() {
               groupStartIndex,
               flatLevels,
               evaluationsMap,
-              groupIndex,
+              group.groupName,
             )
 
             return (
@@ -218,7 +218,7 @@ export function StudentHome() {
                       globalIndex,
                       flatLevels,
                       evaluationsMap,
-                      groupIndex,
+                      group.groupName,
                     )
                     const entry = progress[level.id]
                     const bestScore = entry?.bestScore

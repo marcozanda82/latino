@@ -46,9 +46,9 @@ export function isLevelUnlockedByEvaluation(
   globalIndex: number,
   orderedLevels: Level[],
   evaluationsByFrase: Record<string, unknown>,
-  groupIndex: number,
+  groupName: string,
 ): boolean {
-  if (groupIndex === 0) return true
+  if (groupName.includes('Settimana 1')) return true
 
   if (globalIndex === 0) return true
 
