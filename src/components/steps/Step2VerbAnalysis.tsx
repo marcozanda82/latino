@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import type { Step2AnalisiVerbo } from '../../types'
 import {
@@ -17,6 +17,12 @@ interface Step2VerbAnalysisProps {
   onComplete: () => void
   onError: (message: string) => void
   onMistake?: () => void
+  initialCompleted?: Record<VerbCategory, boolean>
+  initialSelectedAnswers?: Partial<Record<VerbCategory, string>>
+  onStateSnapshot?: (state: {
+    completed: Record<VerbCategory, boolean>
+    selectedAnswers: Partial<Record<VerbCategory, string>>
+  }) => void
 }
 
 const ERROR_TOAST =
@@ -96,13 +102,22 @@ export function Step2VerbAnalysis({
   onComplete,
   onError,
   onMistake,
+  initialCompleted,
+  initialSelectedAnswers,
+  onStateSnapshot,
 }: Step2VerbAnalysisProps) {
-  const [completed, setCompleted] = useState(createInitialCompletedState)
+  const [completed, setCompleted] = useState(
+    () => initialCompleted ?? createInitialCompletedState(),
+  )
   const [selectedAnswers, setSelectedAnswers] = useState<
     Partial<Record<VerbCategory, string>>
-  >({})
+  >(() => initialSelectedAnswers ?? {})
   const [shakingChip, setShakingChip] = useState<string | null>(null)
   const [errorChip, setErrorChip] = useState<string | null>(null)
+
+  useEffect(() => {
+    onStateSnapshot?.({ completed, selectedAnswers })
+  }, [completed, selectedAnswers, onStateSnapshot])
 
   const isInfinitoSelected =
     completed.modo &&

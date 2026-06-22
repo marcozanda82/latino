@@ -25,6 +25,15 @@ import {
   subscribeToStudentEvaluations,
 } from '../services/firebaseEvaluations'
 import type { PendingTranslation } from '../types/evaluation'
+import { useStudentBalance } from '../hooks/useStudentBalance'
+import { RewardsShop } from './RewardsShop'
+
+type StudentTab = 'livelli' | 'negozio'
+
+const TAB_LABELS: Record<StudentTab, string> = {
+  livelli: 'Livelli',
+  negozio: 'Negozio Premi',
+}
 
 const HIDDEN_ACTION_CLICKS = 5
 const HIDDEN_ACTION_RESET_MS = 2000
@@ -75,6 +84,8 @@ export function StudentHome() {
   const [hiddenClickCount, setHiddenClickCount] = useState(0)
   const [showPinModal, setShowPinModal] = useState(false)
   const [evaluations, setEvaluations] = useState<PendingTranslation[]>([])
+  const [activeTab, setActiveTab] = useState<StudentTab>('livelli')
+  const { balance } = useStudentBalance()
 
   const evaluationsMap = useMemo(() => {
     const map: Record<string, PendingTranslation> = {}
@@ -156,13 +167,42 @@ export function StudentHome() {
         </h1>
       </button>
       <p className="mt-2 text-sm leading-relaxed text-slate-600">
-        Ogni livello è un&apos;analisi guidata con punteggio XP.
+        Ogni livello è un&apos;analisi guidata con punteggio XP e Sesterzi da
+        riscattare nel negozio.
+      </p>
+      <p className="mt-4 inline-flex items-center gap-2 rounded-full border border-amber-200/80 bg-amber-50/90 px-4 py-2 text-sm font-semibold tabular-nums text-amber-900">
+        <span aria-hidden>🪙</span>
+        {balance.toLocaleString('it-IT')} Sesterzi
       </p>
     </div>
   )
 
   return (
     <AppLayout header={header}>
+      <GlassCard className="mb-8 !p-2">
+        <div className="flex flex-wrap gap-2">
+          {(['livelli', 'negozio'] as StudentTab[]).map((tab) => (
+            <button
+              key={tab}
+              type="button"
+              onClick={() => setActiveTab(tab)}
+              className={[
+                'flex min-h-11 flex-1 min-w-[7rem] cursor-pointer touch-manipulation items-center justify-center rounded-xl px-4 py-3 text-sm font-medium transition-colors',
+                activeTab === tab
+                  ? 'bg-slate-800 text-white shadow-sm'
+                  : 'text-slate-600 can-hover:hover:bg-slate-50',
+              ].join(' ')}
+            >
+              {TAB_LABELS[tab]}
+            </button>
+          ))}
+        </div>
+      </GlassCard>
+
+      {activeTab === 'negozio' ? (
+        <RewardsShop balance={balance} />
+      ) : (
+        <>
       {!loading && (
         <WeeklyGoalTracker completedCount={weeklyCount} settings={settings} />
       )}
@@ -227,6 +267,9 @@ export function StudentHome() {
                       evaluationsMap[level.analysis.frase_originale]
                     const isAwaitingTutor = evalData?.status === 'in_attesa'
                     const isPlayable = isLevelUnlocked && !isAwaitingTutor
+                    const maxReward =
+                      (level.analysis.parole_array.length * 10) *
+                      (level.analysis.coefficiente || 1.0)
 
                     const cardContent = (
                       <>
@@ -250,6 +293,12 @@ export function StudentHome() {
                         </h3>
                         <p className="mt-2 font-serif text-sm italic leading-relaxed text-slate-600">
                           « {level.analysis.frase_originale} »
+                        </p>
+                        <p className="mt-3 text-xs font-medium text-slate-600">
+                          Valore massimo:{' '}
+                          <span className="font-bold text-yellow-600">
+                            💰 {maxReward.toLocaleString('it-IT')} Sesterzi
+                          </span>
                         </p>
                         <p className="mt-5 text-xs font-medium text-emerald-700">
                           {!isLevelUnlocked ? (
@@ -312,6 +361,8 @@ export function StudentHome() {
             )
           })}
         </div>
+      )}
+        </>
       )}
 
       <TutorPinModal

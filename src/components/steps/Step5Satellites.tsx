@@ -18,6 +18,14 @@ interface Step5SatellitesProps {
   onError: (message: string) => void
   onMistakeChip?: () => void
   onMistakeRetry?: () => void
+  initialCurrentIndex?: number
+  initialCaseLocked?: boolean
+  initialSelectedCase?: LatinCase | null
+  onStateSnapshot?: (state: {
+    currentIndex: number
+    caseLocked: boolean
+    selectedCase: LatinCase | null
+  }) => void
 }
 
 interface CaseChipProps {
@@ -80,11 +88,21 @@ export function Step5Satellites({
   onError,
   onMistakeChip,
   onMistakeRetry,
+  initialCurrentIndex = 0,
+  initialCaseLocked = false,
+  initialSelectedCase = null,
+  onStateSnapshot,
 }: Step5SatellitesProps) {
-  const [currentIndex, setCurrentIndex] = useState(0)
-  const [caseLocked, setCaseLocked] = useState(false)
-  const [selectedCase, setSelectedCase] = useState<LatinCase | null>(null)
+  const [currentIndex, setCurrentIndex] = useState(initialCurrentIndex)
+  const [caseLocked, setCaseLocked] = useState(initialCaseLocked)
+  const [selectedCase, setSelectedCase] = useState<LatinCase | null>(
+    initialSelectedCase,
+  )
   const [shakingCase, setShakingCase] = useState<LatinCase | null>(null)
+
+  useEffect(() => {
+    onStateSnapshot?.({ currentIndex, caseLocked, selectedCase })
+  }, [currentIndex, caseLocked, selectedCase, onStateSnapshot])
 
   useEffect(() => {
     if (complementi.length === 0) {

@@ -54,7 +54,10 @@ function isLatinAnalysis(value: unknown): value is LatinAnalysis {
     step3.parole_corrette.every((word) => typeof word === 'string') &&
     typeof step3.sottinteso === 'boolean' &&
     isTranslationValue(data.step4_nucleo_tradotto) &&
-    validateComplementStructure(data.step5_complementi)
+    validateComplementStructure(data.step5_complementi) &&
+    (data.coefficiente === undefined ||
+      (typeof data.coefficiente === 'number' &&
+        Number.isFinite(data.coefficiente)))
   )
 }
 

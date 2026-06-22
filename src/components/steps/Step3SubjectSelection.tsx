@@ -4,7 +4,7 @@ import {
   type DragEndEvent,
   type DragStartEvent,
 } from '@dnd-kit/core'
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
 import { DropZone } from '../DropZone'
 import { Shelf } from '../Shelf'
@@ -26,6 +26,13 @@ interface Step3SubjectSelectionProps {
   onComplete: () => void
   onError: (message: string) => void
   onMistake?: () => void
+  initialPlacedTileIds?: string[]
+  initialImplicitSuccess?: boolean
+  onStateSnapshot?: (state: {
+    placedTileIds: string[]
+    implicitSuccess: boolean
+  }) => void
+  classroomMode?: boolean
 }
 
 function buildRemainingWords(analysis: LatinAnalysis): string[] {
@@ -38,6 +45,10 @@ export function Step3SubjectSelection({
   onComplete,
   onError,
   onMistake,
+  initialPlacedTileIds = [],
+  initialImplicitSuccess = false,
+  onStateSnapshot,
+  classroomMode = false,
 }: Step3SubjectSelectionProps) {
   const expectedWords = analysis.step3_soggetto.parole_corrette
   const isImplicitExpected = analysis.step3_soggetto.sottinteso
@@ -52,11 +63,17 @@ export function Step3SubjectSelection({
     [tiles],
   )
 
-  const [placedTileIds, setPlacedTileIds] = useState<string[]>([])
+  const [placedTileIds, setPlacedTileIds] = useState<string[]>(
+    initialPlacedTileIds,
+  )
   const [errorTileId, setErrorTileId] = useState<string | null>(null)
   const [draggingTileId, setDraggingTileId] = useState<string | null>(null)
-  const [implicitSuccess, setImplicitSuccess] = useState(false)
+  const [implicitSuccess, setImplicitSuccess] = useState(initialImplicitSuccess)
   const [implicitShaking, setImplicitShaking] = useState(false)
+
+  useEffect(() => {
+    onStateSnapshot?.({ placedTileIds, implicitSuccess })
+  }, [placedTileIds, implicitSuccess, onStateSnapshot])
 
   const placedTiles = placedTileIds
     .map((id) => tileById[id])
@@ -95,7 +112,9 @@ export function Step3SubjectSelection({
       if (isImplicitExpected) {
         setErrorTileId(tile.id)
         onMistake?.()
-        onError(SUBJECT_ERROR_MESSAGES.WRONG_TILE)
+        if (!classroomMode) {
+          onError(SUBJECT_ERROR_MESSAGES.WRONG_TILE)
+        }
         window.setTimeout(() => setErrorTileId(null), 600)
         return
       }
@@ -103,7 +122,9 @@ export function Step3SubjectSelection({
       if (!expectedWords.includes(tile.word)) {
         setErrorTileId(tile.id)
         onMistake?.()
-        onError(SUBJECT_ERROR_MESSAGES.WRONG_TILE)
+        if (!classroomMode) {
+          onError(SUBJECT_ERROR_MESSAGES.WRONG_TILE)
+        }
         window.setTimeout(() => setErrorTileId(null), 600)
         return
       }
@@ -144,9 +165,11 @@ export function Step3SubjectSelection({
 
     setImplicitShaking(true)
     onMistake?.()
-    onError(SUBJECT_ERROR_MESSAGES.WRONG_IMPLICIT)
+    if (!classroomMode) {
+      onError(SUBJECT_ERROR_MESSAGES.WRONG_IMPLICIT)
+    }
     window.setTimeout(() => setImplicitShaking(false), 500)
-  }, [isComplete, isImplicitExpected, onComplete, onError, onMistake])
+  }, [classroomMode, isComplete, isImplicitExpected, onComplete, onError, onMistake])
 
   return (
     <DndContext
@@ -211,10 +234,12 @@ export function Step3SubjectSelection({
             {implicitSuccess
               ? 'Soggetto sottinteso confermato.'
               : isDragComplete
-                ? 'Soggetto individuato correttamente.'
-                : isImplicitExpected
-                  ? 'Il soggetto non compare in frase: usa il pulsante dedicato.'
-                  : `Parole del soggetto: ${placedWords.length} di ${expectedWords.length}`}
+                ? 'Soggetto individuato.'
+                : classroomMode
+                  ? 'Trascina le parole del soggetto o usa il pulsante sottinteso.'
+                  : isImplicitExpected
+                    ? 'Il soggetto non compare in frase: usa il pulsante dedicato.'
+                    : `Parole del soggetto: ${placedWords.length} di ${expectedWords.length}`}
           </p>
         </div>
       </div>

@@ -8,6 +8,7 @@ import { PageTransition } from './components/layout/PageTransition'
 import { PlayLevel } from './components/PlayLevel'
 import { StudentHome } from './components/StudentHome'
 import { TutorRoute } from './components/TutorRoute'
+import { TutorReviewPage } from './pages/TutorReviewPage'
 
 function AnimatedRoutes() {
   const location = useLocation()
@@ -37,6 +38,16 @@ function AnimatedRoutes() {
             <PageTransition>
               <TutorRoute>
                 <AdminDashboard />
+              </TutorRoute>
+            </PageTransition>
+          }
+        />
+        <Route
+          path="/admin/valutazioni"
+          element={
+            <PageTransition>
+              <TutorRoute>
+                <TutorReviewPage />
               </TutorRoute>
             </PageTransition>
           }

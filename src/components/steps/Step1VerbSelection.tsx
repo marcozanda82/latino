@@ -24,10 +24,16 @@ interface Step1VerbSelectionProps {
   onMistake?: () => void
   showAvantiButton?: boolean
   onAdvance?: () => void
+  initialPlacedTileId?: string | null
+  onStateSnapshot?: (state: {
+    placedTileId: string | null
+    isComplete: boolean
+  }) => void
+  /** Compito in classe: niente toast che rivelano la risposta */
+  classroomMode?: boolean
 }
 
 const GENERIC_VERB_ERROR = 'Parola sbagliata. Riprova.'
-const MISTAKES_BEFORE_SOLUTION = 2
 
 function buildTiles(parole: string[]): TileData[] {
   return parole.map((word, index) => ({
@@ -44,6 +50,9 @@ export function Step1VerbSelection({
   onMistake,
   showAvantiButton = false,
   onAdvance,
+  initialPlacedTileId = null,
+  onStateSnapshot,
+  classroomMode = false,
 }: Step1VerbSelectionProps) {
   const tiles = useMemo(
     () => buildTiles(analysis.parole_array),
@@ -54,16 +63,21 @@ export function Step1VerbSelection({
     [tiles],
   )
 
-  const [placedTileId, setPlacedTileId] = useState<string | null>(null)
+  const [placedTileId, setPlacedTileId] = useState<string | null>(
+    initialPlacedTileId,
+  )
   const [errorTileId, setErrorTileId] = useState<string | null>(null)
   const [draggingTileId, setDraggingTileId] = useState<string | null>(null)
-  const [isComplete, setIsComplete] = useState(false)
-  const [mistakeCount, setMistakeCount] = useState(0)
+  const [isComplete, setIsComplete] = useState(Boolean(initialPlacedTileId))
 
   const sensors = useDragSensors()
 
   const placedTile = placedTileId ? tileById[placedTileId] : null
   const draggingTile = draggingTileId ? tileById[draggingTileId] : null
+
+  useEffect(() => {
+    onStateSnapshot?.({ placedTileId, isComplete })
+  }, [placedTileId, isComplete, onStateSnapshot])
 
   useEffect(() => {
     if (isComplete) {
@@ -94,23 +108,18 @@ export function Step1VerbSelection({
         setErrorTileId(null)
         setIsComplete(true)
       } else {
-        const nextMistakeCount = mistakeCount + 1
-        setMistakeCount(nextMistakeCount)
         setErrorTileId(tile.id)
         onMistake?.()
-        onError(
-          nextMistakeCount >= MISTAKES_BEFORE_SOLUTION
-            ? analysis.step1_verbo.spiegazione_errore
-            : GENERIC_VERB_ERROR,
-        )
+        if (!classroomMode) {
+          onError(GENERIC_VERB_ERROR)
+        }
         window.setTimeout(() => setErrorTileId(null), 600)
       }
     },
     [
       analysis.step1_verbo.parola_corretta,
-      analysis.step1_verbo.spiegazione_errore,
+      classroomMode,
       isComplete,
-      mistakeCount,
       onError,
       onMistake,
       tileById,

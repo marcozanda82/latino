@@ -164,6 +164,17 @@ export function TutorDashboard({
                         +40 punti
                       </p>
                     </div>
+
+                    {typeof item.reward === 'number' && item.reward > 0 ? (
+                      <div className="rounded-lg border border-amber-100 bg-amber-50 px-4 py-3 md:col-span-2">
+                        <p className="text-xs font-semibold uppercase tracking-widest text-amber-700">
+                          Sesterzi guadagnati
+                        </p>
+                        <p className="mt-2 text-sm font-medium tabular-nums text-amber-900">
+                          +{item.reward.toLocaleString('it-IT')} Sesterzi
+                        </p>
+                      </div>
+                    ) : null}
                   </div>
 
                   <div className="mt-5 grid gap-4 md:grid-cols-2">

@@ -11,6 +11,8 @@ interface Step4CoreTranslationProps {
   onComplete: () => void
   onTranslationConfirmed?: (translation: string) => void
   onMistake?: () => void
+  initialTranslation?: string
+  initialConfirmed?: boolean
 }
 
 function buildLatinCore(
@@ -30,8 +32,10 @@ export function Step4CoreTranslation({
   onComplete,
   onTranslationConfirmed,
   onMistake,
+  initialTranslation = '',
+  initialConfirmed = false,
 }: Step4CoreTranslationProps) {
-  const [isSuccess, setIsSuccess] = useState(false)
+  const [isSuccess, setIsSuccess] = useState(initialConfirmed)
   const latinCore = buildLatinCore(verb, subjectWords, isSubjectImplicit)
 
   return (
@@ -64,6 +68,8 @@ export function Step4CoreTranslation({
         onTranslationConfirmed={onTranslationConfirmed}
         onRetry={onMistake}
         onSuccessChange={setIsSuccess}
+        initialTranslation={initialTranslation}
+        initialConfirmed={initialConfirmed}
       />
     </motion.div>
   )

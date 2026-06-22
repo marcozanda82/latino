@@ -1,67 +1,12 @@
-import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { TutorDashboard } from '../components/TutorDashboard'
-import type {
-  EvaluationStatus,
-  PendingTranslation,
-} from '../types/evaluation'
 import { AppLayout } from '../components/layout/AppLayout'
-import { showError, showSuccess } from '../lib/toast'
+import { usePendingEvaluations } from '../hooks/usePendingEvaluations'
 import { clearTutorAuthentication } from '../services/tutorAuthService'
-import {
-  subscribeToPendingEvaluations,
-  updateEvaluationStatus,
-} from '../services/firebaseEvaluations'
-
-const STATUS_SUCCESS_LABELS: Record<
-  Exclude<EvaluationStatus, 'in_attesa'>,
-  string
-> = {
-  verde: 'Traduzione segnata come corretta.',
-  giallo: 'Traduzione segnata come parziale.',
-  rosso: 'Traduzione segnata come errata.',
-}
 
 export function TutorReviewPage() {
   const navigate = useNavigate()
-  const [pending, setPending] = useState<PendingTranslation[]>([])
-  const [evaluatingId, setEvaluatingId] = useState<string | null>(null)
-
-  useEffect(() => {
-    const unsubscribe = subscribeToPendingEvaluations((frasi) => {
-      console.log('[TUTOR DEBUG] Frasi caricate nel dashboard:', frasi)
-      setPending(frasi)
-    })
-    return unsubscribe
-  }, [])
-
-  const handleEvaluate = useCallback(
-    async (
-      id: string,
-      status: EvaluationStatus,
-      bonusScore: number,
-      mechanicalScore: number,
-    ) => {
-      if (status === 'in_attesa' || evaluatingId) return
-
-      const totalScore = mechanicalScore + bonusScore
-
-      setEvaluatingId(id)
-
-      try {
-        await updateEvaluationStatus(id, status, bonusScore, totalScore)
-        showSuccess(
-          `${STATUS_SUCCESS_LABELS[status]} Voto finale: ${totalScore}/100.`,
-        )
-      } catch (error) {
-        console.error('[TutorReviewPage] handleEvaluate failed:', error)
-        showError('Impossibile salvare la valutazione. Riprova.')
-      } finally {
-        setEvaluatingId(null)
-      }
-    },
-    [evaluatingId],
-  )
+  const { pending, evaluatingId, handleEvaluate } = usePendingEvaluations()
 
   const handleExitToStudent = () => {
     clearTutorAuthentication()
@@ -84,8 +29,15 @@ export function TutorReviewPage() {
           </p>
           <button
             type="button"
+            onClick={() => navigate('/admin')}
+            className="mt-4 w-full rounded-xl border border-slate-300 bg-white/80 px-6 py-3 text-sm font-semibold text-slate-800 shadow-sm transition-colors can-hover:hover:bg-slate-50 sm:mr-3 sm:w-auto"
+          >
+            Torna alla plancia
+          </button>
+          <button
+            type="button"
             onClick={handleExitToStudent}
-            className="mt-5 w-full rounded-xl border border-slate-300 bg-white/80 px-6 py-3 text-sm font-semibold text-slate-800 shadow-sm transition-colors hover:bg-slate-50 sm:w-auto"
+            className="mt-3 w-full rounded-xl border border-slate-300 bg-white/80 px-6 py-3 text-sm font-semibold text-slate-800 shadow-sm transition-colors can-hover:hover:bg-slate-50 sm:mt-4 sm:w-auto"
           >
             Esci e torna alla Modalità Studente
           </button>

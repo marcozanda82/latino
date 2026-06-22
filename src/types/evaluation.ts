@@ -9,6 +9,8 @@ export interface PendingTranslation {
   traduzioneStudente: string
   status: EvaluationStatus
   mechanicalScore: number
+  /** Sesterzi guadagnati dallo studente al completamento */
+  reward?: number
   bonusScore?: number
   totalScore?: number
   createdAt?: Timestamp

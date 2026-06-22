@@ -14,6 +14,8 @@ interface SelfAssessmentTranslationProps {
   onTranslationConfirmed?: (translation: string) => void
   onRetry?: () => void
   onSuccessChange?: (success: boolean) => void
+  initialTranslation?: string
+  initialConfirmed?: boolean
 }
 
 export function SelfAssessmentTranslation({
@@ -24,11 +26,13 @@ export function SelfAssessmentTranslation({
   onTranslationConfirmed,
   onRetry,
   onSuccessChange,
+  initialTranslation = '',
+  initialConfirmed = false,
 }: SelfAssessmentTranslationProps) {
-  const [translation, setTranslation] = useState('')
+  const [translation, setTranslation] = useState(initialTranslation)
   const [isVerified, setIsVerified] = useState(false)
-  const [isAutoSuccess, setIsAutoSuccess] = useState(false)
-  const [isSuccess, setIsSuccess] = useState(false)
+  const [isAutoSuccess, setIsAutoSuccess] = useState(initialConfirmed)
+  const [isSuccess, setIsSuccess] = useState(initialConfirmed)
 
   const primaryReference = getPrimaryTranslation(referenceTranslation)
   const inputLocked = isVerified || isSuccess

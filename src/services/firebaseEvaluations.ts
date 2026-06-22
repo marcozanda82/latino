@@ -14,6 +14,7 @@ import type {
   PendingTranslation,
 } from '../types/evaluation'
 import { db } from '../config/firebase'
+import { addSesterzi, getStudentBalanceDocPath, getStudentUserId } from './studentService'
 
 const EVALUATIONS_COLLECTION = 'evaluations'
 const PENDING_STATUS: EvaluationStatus = 'in_attesa'
@@ -66,6 +67,7 @@ function mapDocToPendingTranslation(
     mechanicalScore,
     bonusScore:
       typeof data.bonusScore === 'number' ? data.bonusScore : undefined,
+    reward: typeof data.reward === 'number' ? data.reward : undefined,
     totalScore:
       typeof data.totalScore === 'number' ? data.totalScore : undefined,
     status,
@@ -82,9 +84,30 @@ export async function submitTranslationForReview(
       traduzioneAttesa: data.traduzioneAttesa,
       traduzioneStudente: data.traduzioneStudente,
       mechanicalScore: data.mechanicalScore,
+      reward: data.reward ?? 0,
       status: PENDING_STATUS,
       createdAt: serverTimestamp(),
     })
+
+    const userId = getStudentUserId()
+    const docPath = getStudentBalanceDocPath()
+
+    console.log('[firebaseEvaluations] Valutazione salvata — accredito Sesterzi:', {
+      evaluationId: docRef.id,
+      reward: data.reward,
+      mechanicalScore: data.mechanicalScore,
+      userId,
+      docPath,
+    })
+
+    if (typeof data.reward !== 'number' || data.reward <= 0) {
+      console.warn(
+        '[firebaseEvaluations] reward assente o 0 — nessun incremento saldo:',
+        data.reward,
+      )
+    } else {
+      await addSesterzi(data.reward)
+    }
 
     return docRef.id
   } catch (error) {

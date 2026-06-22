@@ -15,13 +15,17 @@ import {
   type GamificationSettings,
 } from '../services/settingsService'
 import { getExistingGroupNames } from '../utils/levelGroups'
+import { usePendingEvaluations } from '../hooks/usePendingEvaluations'
+import { TutorDashboard } from './TutorDashboard'
+import { TutorRewardsManager } from './TutorRewardsManager'
 import type { LatinAnalysis } from '../types'
 
-type AdminTab = 'esercizi' | 'obiettivi'
+type AdminTab = 'esercizi' | 'obiettivi' | 'valutazioni'
 
 const TAB_LABELS: Record<AdminTab, string> = {
   esercizi: 'Esercizi',
-  obiettivi: 'Obiettivi',
+  obiettivi: 'Premi Shop',
+  valutazioni: 'Valutazioni',
 }
 
 export function AdminDashboard() {
@@ -38,6 +42,8 @@ export function AdminDashboard() {
   )
   const [settingsLoading, setSettingsLoading] = useState(true)
   const [settingsSaving, setSettingsSaving] = useState(false)
+  const { pending, pendingCount, evaluatingId, handleEvaluate } =
+    usePendingEvaluations()
 
   const existingGroupNames = useMemo(
     () => getExistingGroupNames(levels),
@@ -109,7 +115,7 @@ export function AdminDashboard() {
             Plancia di comando
           </h1>
           <p className="mt-2 text-sm leading-relaxed text-slate-600">
-            Gestisci esercizi, settimane e obiettivi motivazionali.
+            Gestisci esercizi, premi shop, obiettivi settimanali e valutazioni.
           </p>
           <button
             type="button"
@@ -122,41 +128,66 @@ export function AdminDashboard() {
       }
     >
       <GlassCard className="mb-8 !p-2">
-        <div className="flex gap-2">
-          {(['esercizi', 'obiettivi'] as AdminTab[]).map((tab) => (
+        <div className="flex flex-wrap gap-2">
+          {(['esercizi', 'obiettivi', 'valutazioni'] as AdminTab[]).map((tab) => (
             <button
               key={tab}
               type="button"
               onClick={() => setActiveTab(tab)}
               className={[
-                'flex-1 rounded-xl px-4 py-3 text-sm font-medium transition-colors',
+                'relative flex min-h-11 flex-1 min-w-[7rem] cursor-pointer touch-manipulation items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-medium transition-colors',
                 activeTab === tab
                   ? 'bg-slate-800 text-white shadow-sm'
-                  : 'text-slate-600 hover:bg-slate-50',
+                  : 'text-slate-600 can-hover:hover:bg-slate-50',
               ].join(' ')}
             >
-              {TAB_LABELS[tab]}
+              <span>{TAB_LABELS[tab]}</span>
+              {tab === 'valutazioni' && pendingCount > 0 ? (
+                <span
+                  className={[
+                    'inline-flex min-w-5 items-center justify-center rounded-full px-1.5 py-0.5 text-[10px] font-bold tabular-nums',
+                    activeTab === tab
+                      ? 'bg-rose-500 text-white'
+                      : 'bg-rose-100 text-rose-700',
+                  ].join(' ')}
+                  aria-label={`${pendingCount} correzioni in sospeso`}
+                >
+                  {pendingCount}
+                </span>
+              ) : null}
             </button>
           ))}
         </div>
       </GlassCard>
 
       <main className="space-y-8">
-        {activeTab === 'obiettivi' && (
-          <GlassCard>
-            <h2 className="text-lg font-semibold text-slate-800">
-              Obiettivi settimanali
-            </h2>
-            <p className="mt-2 text-sm leading-relaxed text-slate-600">
-              Configura il traguardo e il premio mostrati allo studente.
-            </p>
+        {activeTab === 'valutazioni' && (
+          <TutorDashboard
+            pendingTranslations={pending}
+            evaluatingId={evaluatingId}
+            onEvaluate={handleEvaluate}
+          />
+        )}
 
-            {settingsLoading ? (
-              <div className="mt-6 space-y-4">
-                <LevelCardsSkeleton count={1} />
-              </div>
-            ) : (
-              <div className="mt-6 space-y-6">
+        {activeTab === 'obiettivi' && (
+          <div className="space-y-8">
+            <TutorRewardsManager />
+
+            <GlassCard>
+              <h2 className="text-lg font-semibold text-slate-800">
+                Obiettivo settimanale
+              </h2>
+              <p className="mt-2 text-sm leading-relaxed text-slate-600">
+                Traguardo e premio simbolico mostrati nella barra settimanale
+                dello studente.
+              </p>
+
+              {settingsLoading ? (
+                <div className="mt-6 space-y-4">
+                  <LevelCardsSkeleton count={1} />
+                </div>
+              ) : (
+                <div className="mt-6 space-y-6">
                   <div>
                     <label
                       htmlFor="weekly-target"
@@ -208,11 +239,12 @@ export function AdminDashboard() {
                     disabled={settingsSaving}
                     className="rounded-lg bg-slate-800 px-6 py-3 text-sm font-medium text-white shadow-sm transition-all hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400"
                   >
-                    {settingsSaving ? 'Salvataggio...' : 'Salva Obiettivi'}
+                    {settingsSaving ? 'Salvataggio...' : 'Salva obiettivo settimanale'}
                   </button>
                 </div>
-            )}
-          </GlassCard>
+              )}
+            </GlassCard>
+          </div>
         )}
 
         {activeTab === 'esercizi' && (

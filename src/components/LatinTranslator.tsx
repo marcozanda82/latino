@@ -8,11 +8,12 @@ import { Step5Satellites } from './steps/Step5Satellites'
 import { ScoreBadge } from './ScoreBadge'
 import { AppLayout } from './layout/AppLayout'
 import { GlassCard } from './ui/GlassCard'
+import { FinalReviewPanel } from './FinalReviewPanel'
 import { buildFullTranslation } from '../utils/complements'
 import { showError } from '../lib/toast'
 import {
   applyPenalty,
-  getMotivationalMessage,
+  calculateFinalSesterziReward,
   XP_INITIAL,
   XP_PENALTY_CHIP,
   XP_PENALTY_DRAG,
@@ -21,7 +22,13 @@ import {
 import type { LatinAnalysis } from '../types'
 import { saveLevelScore } from '../services/progressService'
 import { submitTranslationForReview } from '../services/firebaseEvaluations'
-import { getPrimaryTranslation } from '../utils/textNormalization'
+import {
+  getStudentBalanceDocPath,
+  getStudentUserId,
+} from '../services/studentService'
+import { deleteExerciseDraft } from '../services/draftService'
+import type { VerbCategory } from '../utils/verbAnalysis'
+import type { LatinCase } from '../utils/caseAnalysis'
 
 type AppStep = 1 | 2 | 3 | 4 | 5
 
@@ -62,6 +69,41 @@ export function LatinTranslator({
     useState<string[]>([])
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isSubmitted, setIsSubmitted] = useState(false)
+  const [earnedSesterzi, setEarnedSesterzi] = useState<number | null>(null)
+  const [step1Snapshot, setStep1Snapshot] = useState({
+    placedTileId: null as string | null,
+    isComplete: false,
+  })
+  const [step2Snapshot, setStep2Snapshot] = useState<{
+    completed: Record<VerbCategory, boolean>
+    selectedAnswers: Partial<Record<VerbCategory, string>>
+  }>({
+    completed: {
+      modo: false,
+      persona: false,
+      numero: false,
+      tempo: false,
+      forma: false,
+    },
+    selectedAnswers: {},
+  })
+  const [step3Snapshot, setStep3Snapshot] = useState({
+    placedTileIds: [] as string[],
+    implicitSuccess: false,
+  })
+  const [step5Snapshot, setStep5Snapshot] = useState({
+    currentIndex: 0,
+    caseLocked: false,
+    selectedCase: null as LatinCase | null,
+  })
+  const [inReview, setInReview] = useState(false)
+  const [reviewEditStep, setReviewEditStep] = useState<AppStep | null>(null)
+
+  useEffect(() => {
+    if (levelId) {
+      void deleteExerciseDraft(levelId)
+    }
+  }, [levelId])
 
   useEffect(() => {
     if (step5Complete && levelId) {
@@ -124,14 +166,42 @@ export function LatinTranslator({
 
     setIsSubmitting(true)
 
+    const reward = calculateFinalSesterziReward(analysis, mechanicalScore)
+    const userId = getStudentUserId()
+    const docPath = getStudentBalanceDocPath()
+
+    console.log('[LatinTranslator] Invio valutazione — payload reward:', {
+      reward,
+      mechanicalScore,
+      userId,
+      docPath,
+      paroleCount: analysis.parole_array.length,
+      coefficiente: analysis.coefficiente ?? 1.0,
+      studentFullTranslation: studentFullTranslation.trim(),
+    })
+
+    if (reward === undefined || reward <= 0) {
+      console.warn(
+        '[LatinTranslator] reward è 0 o non valido — il saldo non verrà incrementato.',
+        { reward, mechanicalScore },
+      )
+    }
+
     try {
       await submitTranslationForReview({
         fraseOriginale: analysis.frase_originale,
         traduzioneAttesa: fullTranslation,
         traduzioneStudente: studentFullTranslation,
         mechanicalScore,
+        reward,
       })
+      if (levelId) {
+        await deleteExerciseDraft(levelId)
+      }
+      setEarnedSesterzi(reward)
       setIsSubmitted(true)
+      setInReview(true)
+      setReviewEditStep(null)
     } catch (error) {
       console.error('[LatinTranslator] handleSubmitToTutor failed:', error)
       showError('Impossibile inviare la traduzione al tutor. Riprova.')
@@ -140,7 +210,11 @@ export function LatinTranslator({
     }
   }
 
-  const showAvanti = currentStep >= 1 && currentStep <= 4
+  const showAvanti =
+    !inReview &&
+    !step5Complete &&
+    currentStep >= 1 &&
+    currentStep <= 4
 
   const isAvantiEnabled =
     (currentStep === 1 && step1Complete) ||
@@ -156,7 +230,59 @@ export function LatinTranslator({
   }
 
   const fullTranslation = buildFullTranslation(analysis)
-  const motivationalMessage = getMotivationalMessage(score)
+
+  const showStepContent = !inReview || reviewEditStep !== null
+  const showReviewPanel = inReview && reviewEditStep === null
+  const showCompletionPrompt = step5Complete && !inReview && !isSubmitted
+
+  const handleEnterReview = () => {
+    setInReview(true)
+    setReviewEditStep(null)
+  }
+
+  const handleEditFromReview = (step: AppStep) => {
+    setReviewEditStep(step)
+    setCurrentStep(step)
+  }
+
+  const handleReturnToReview = () => {
+    setReviewEditStep(null)
+  }
+
+  const handleStep1Snapshot = useCallback(
+    (state: { placedTileId: string | null; isComplete: boolean }) => {
+      setStep1Snapshot(state)
+    },
+    [],
+  )
+
+  const handleStep2Snapshot = useCallback(
+    (state: {
+      completed: Record<VerbCategory, boolean>
+      selectedAnswers: Partial<Record<VerbCategory, string>>
+    }) => {
+      setStep2Snapshot(state)
+    },
+    [],
+  )
+
+  const handleStep3Snapshot = useCallback(
+    (state: { placedTileIds: string[]; implicitSuccess: boolean }) => {
+      setStep3Snapshot(state)
+    },
+    [],
+  )
+
+  const handleStep5Snapshot = useCallback(
+    (state: {
+      currentIndex: number
+      caseLocked: boolean
+      selectedCase: LatinCase | null
+    }) => {
+      setStep5Snapshot(state)
+    },
+    [],
+  )
 
   return (
     <AppLayout
@@ -176,9 +302,11 @@ export function LatinTranslator({
             {levelTitle}
           </h1>
           <p className="mt-2 text-sm leading-relaxed text-slate-600">
-            {step5Complete
-              ? 'Hai completato l\'intera analisi e traduzione della frase.'
-              : 'Completa ogni passaggio prima di proseguire.'}
+            {inReview
+              ? 'Rileggi il tuo lavoro e invialo al Tutor quando sei pronta.'
+              : step5Complete
+                ? 'Tutti gli step sono completati. Passa alla revisione finale.'
+                : 'Completa ogni passaggio prima di proseguire.'}
           </p>
 
           <div className="mt-5 flex items-center gap-3">
@@ -198,17 +326,34 @@ export function LatinTranslator({
               ))}
             </div>
             <span className="text-xs font-medium text-slate-600">
-              {step5Complete
-                ? 'Completato'
-                : `Step ${currentStep} — ${STEP_LABELS[currentStep]}`}
+              {inReview
+                ? 'Revisione finale'
+                : step5Complete
+                  ? 'Completato'
+                  : `Step ${currentStep} — ${STEP_LABELS[currentStep]}`}
             </span>
           </div>
         </div>
       }
     >
       <GlassCard>
+          {inReview && reviewEditStep !== null ? (
+            <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-sky-200 bg-sky-50 px-4 py-3">
+              <p className="text-sm font-medium text-sky-900">
+                Modifica Step {reviewEditStep} — {STEP_LABELS[reviewEditStep]}
+              </p>
+              <button
+                type="button"
+                onClick={handleReturnToReview}
+                className="cursor-pointer rounded-lg border border-sky-300 bg-white px-4 py-2 text-sm font-medium text-sky-800 can-hover:hover:bg-sky-100"
+              >
+                Torna alla revisione
+              </button>
+            </div>
+          ) : null}
+
           <AnimatePresence mode="wait">
-            {currentStep === 1 && (
+            {showStepContent && currentStep === 1 && (
               <motion.div
                 key="step-1"
                 initial={{ opacity: 0, scale: 0.98 }}
@@ -222,11 +367,14 @@ export function LatinTranslator({
                   onError={showError}
                   onMistake={() => handleStepMistake(XP_PENALTY_DRAG)}
                   showAvantiButton={false}
+                  classroomMode
+                  initialPlacedTileId={step1Snapshot.placedTileId}
+                  onStateSnapshot={handleStep1Snapshot}
                 />
               </motion.div>
             )}
 
-            {currentStep === 2 && (
+            {showStepContent && currentStep === 2 && (
               <motion.div
                 key="step-2"
                 initial={{ opacity: 0, scale: 0.98, y: 12 }}
@@ -240,11 +388,14 @@ export function LatinTranslator({
                   onComplete={() => setStep2Complete(true)}
                   onError={showError}
                   onMistake={() => handleStepMistake(XP_PENALTY_CHIP)}
+                  initialCompleted={step2Snapshot.completed}
+                  initialSelectedAnswers={step2Snapshot.selectedAnswers}
+                  onStateSnapshot={handleStep2Snapshot}
                 />
               </motion.div>
             )}
 
-            {currentStep === 3 && (
+            {showStepContent && currentStep === 3 && (
               <motion.div
                 key="step-3"
                 initial={{ opacity: 0, scale: 0.98, y: 12 }}
@@ -257,11 +408,15 @@ export function LatinTranslator({
                   onComplete={() => setStep3Complete(true)}
                   onError={showError}
                   onMistake={() => handleStepMistake(XP_PENALTY_DRAG)}
+                  classroomMode
+                  initialPlacedTileIds={step3Snapshot.placedTileIds}
+                  initialImplicitSuccess={step3Snapshot.implicitSuccess}
+                  onStateSnapshot={handleStep3Snapshot}
                 />
               </motion.div>
             )}
 
-            {currentStep === 4 && (
+            {showStepContent && currentStep === 4 && (
               <motion.div
                 key="step-4"
                 initial={{ opacity: 0, scale: 0.98, y: 12 }}
@@ -277,11 +432,15 @@ export function LatinTranslator({
                   onComplete={() => setStep4Complete(true)}
                   onTranslationConfirmed={setStudentCoreTranslation}
                   onMistake={() => handleStepMistake(XP_PENALTY_RETRY)}
+                  initialTranslation={studentCoreTranslation}
+                  initialConfirmed={step4Complete}
                 />
               </motion.div>
             )}
 
-            {currentStep === 5 && (
+            {showStepContent &&
+              currentStep === 5 &&
+              !(step5Complete && !inReview && !reviewEditStep) && (
               <motion.div
                 key="step-5"
                 initial={{ opacity: 0, scale: 0.98, y: 12 }}
@@ -296,134 +455,69 @@ export function LatinTranslator({
                   onError={showError}
                   onMistakeChip={() => handleStepMistake(XP_PENALTY_CHIP)}
                   onMistakeRetry={() => handleStepMistake(XP_PENALTY_RETRY)}
+                  initialCurrentIndex={step5Snapshot.currentIndex}
+                  initialCaseLocked={step5Snapshot.caseLocked}
+                  initialSelectedCase={step5Snapshot.selectedCase}
+                  onStateSnapshot={handleStep5Snapshot}
                 />
               </motion.div>
             )}
           </AnimatePresence>
 
           <AnimatePresence>
-            {step5Complete && (
+            {showCompletionPrompt && (
               <motion.div
-                key="victory"
+                key="completion-prompt"
                 initial={{ opacity: 0, y: 16 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ type: 'spring', stiffness: 260, damping: 26 }}
-                className="mt-8 rounded-xl border border-emerald-200 bg-emerald-50 px-6 py-8"
+                className="mt-8 rounded-xl border border-emerald-200 bg-emerald-50 px-6 py-8 text-center"
               >
-                <p className="text-center text-xs font-semibold uppercase tracking-widest text-emerald-600">
-                  Frase completata
+                <p className="text-xs font-semibold uppercase tracking-widest text-emerald-600">
+                  Analisi completata
                 </p>
-
-                <div className="mx-auto mt-6 flex w-fit flex-col items-center rounded-2xl border border-amber-200 bg-amber-50 px-10 py-8 shadow-sm">
-                  <span className="text-4xl" aria-hidden>
-                    🏆
-                  </span>
-                  <p className="mt-3 text-3xl font-bold tabular-nums text-amber-900">
-                    {score} XP
-                  </p>
-                  <p className="mt-2 text-lg font-medium text-emerald-900">
-                    {motivationalMessage}
-                  </p>
-                </div>
-
-                <div className="mt-6 space-y-4 rounded-lg border border-emerald-100 bg-white/70 p-5 text-left">
-                  <div>
-                    <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">
-                      Latino
-                    </p>
-                    <p className="mt-1 font-serif text-lg italic text-slate-700">
-                      « {analysis.frase_originale} »
-                    </p>
-                  </div>
-
-                  <div>
-                    <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">
-                      Nucleo
-                    </p>
-                    <p className="mt-1 text-base text-slate-800">
-                      {getPrimaryTranslation(analysis.step4_nucleo_tradotto)}
-                    </p>
-                  </div>
-
-                  {analysis.step5_complementi.length > 0 && (
-                    <div>
-                      <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">
-                        Complementi
-                      </p>
-                      <ul className="mt-2 space-y-2">
-                        {analysis.step5_complementi.map((item, index) => (
-                          <li
-                            key={`${item.parole.join('-')}-${index}`}
-                            className="flex flex-wrap items-baseline gap-2 text-sm text-slate-700"
-                          >
-                            <span className="font-serif text-slate-500">
-                              {item.parole.join(' ')}
-                            </span>
-                            <span className="text-slate-300">→</span>
-                            <span>{getPrimaryTranslation(item.traduzione)}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-
-                  <div className="border-t border-emerald-100 pt-4">
-                    <p className="text-xs font-semibold uppercase tracking-widest text-emerald-600">
-                      Traduzione completa
-                    </p>
-                    <p className="mt-2 text-lg font-medium text-emerald-900">
-                      {fullTranslation}
-                    </p>
-                  </div>
-
-                  {studentFullTranslation && (
-                    <div className="border-t border-emerald-100 pt-4">
-                      <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">
-                        La tua traduzione
-                      </p>
-                      <p className="mt-2 text-lg font-medium text-slate-800">
-                        {studentFullTranslation}
-                      </p>
-                    </div>
-                  )}
-                </div>
-
-                {!isSubmitted ? (
-                  <div className="mt-6 flex justify-center">
-                    <button
-                      type="button"
-                      onClick={handleSubmitToTutor}
-                      disabled={isSubmitting || !studentFullTranslation.trim()}
-                      className="cursor-pointer rounded-lg border border-sky-600 bg-sky-600 px-8 py-3 text-sm font-medium text-white shadow-sm transition-all can-hover:hover:bg-sky-700 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-200 disabled:text-slate-400"
-                    >
-                      {isSubmitting ? 'Invio in corso…' : 'Invia per la correzione'}
-                    </button>
-                  </div>
-                ) : (
-                  <GlassCard className="mt-6 border border-sky-200 bg-sky-50/80 !p-5 text-center">
-                    <p className="text-sm font-medium text-sky-900">
-                      Analisi completata! Hai protetto {mechanicalScore} punti su
-                      60. La traduzione è stata inviata per la valutazione
-                      finale: puoi guadagnare fino a +40 punti di Bonus
-                      Traduzione!
-                    </p>
-                  </GlassCard>
-                )}
-
-                <div className="mt-8 flex justify-center">
-                  <button
-                    type="button"
-                    onClick={onBackToLevels}
-                    className="cursor-pointer rounded-lg bg-slate-800 px-8 py-3 text-sm font-medium text-white shadow-sm transition-all can-hover:hover:bg-slate-700"
-                  >
-                    Torna ai Livelli
-                  </button>
-                </div>
+                <p className="mt-3 text-3xl font-bold tabular-nums text-amber-900">
+                  {score} XP
+                </p>
+                <p className="mt-2 text-sm text-slate-600">
+                  Analisi meccanica: {mechanicalScore}/60
+                </p>
+                <p className="mt-4 text-sm leading-relaxed text-slate-700">
+                  Rileggi tutto il tuo lavoro prima di inviarlo al Tutor.
+                </p>
+                <button
+                  type="button"
+                  onClick={handleEnterReview}
+                  className="mt-6 min-h-11 cursor-pointer rounded-lg border border-sky-600 bg-sky-600 px-8 py-3 text-sm font-semibold text-white shadow-sm transition-all can-hover:hover:bg-sky-700"
+                >
+                  Controlla e Invia
+                </button>
               </motion.div>
             )}
           </AnimatePresence>
 
-          {showAvanti && !step5Complete && (
+          {showReviewPanel ? (
+            <FinalReviewPanel
+              analysis={analysis}
+              step1PlacedTileId={step1Snapshot.placedTileId}
+              step2SelectedAnswers={step2Snapshot.selectedAnswers}
+              step3PlacedTileIds={step3Snapshot.placedTileIds}
+              step3ImplicitSuccess={step3Snapshot.implicitSuccess}
+              studentCoreTranslation={studentCoreTranslation}
+              studentComplementTranslations={studentComplementTranslations}
+              studentFullTranslation={studentFullTranslation}
+              score={score}
+              mechanicalScore={mechanicalScore}
+              isSubmitting={isSubmitting}
+              isSubmitted={isSubmitted}
+              earnedSesterzi={earnedSesterzi}
+              onEditStep={handleEditFromReview}
+              onSubmit={handleSubmitToTutor}
+              onBackToLevels={onBackToLevels}
+            />
+          ) : null}
+
+          {showAvanti && (
             <motion.div
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: isAvantiEnabled ? 1 : 0.4, y: 0 }}

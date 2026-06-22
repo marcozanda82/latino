@@ -31,6 +31,8 @@ export interface Complemento {
 export interface LatinAnalysis {
   frase_originale: string
   parole_array: string[]
+  /** Moltiplicatore ricompensa Sesterzi (default 1.0) */
+  coefficiente?: number
   step1_verbo: Step1Verbo
   step2_analisi_verbo: Step2AnalisiVerbo
   step3_soggetto: Step3Soggetto
