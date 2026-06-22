@@ -54,9 +54,10 @@ function ChipButton({
   return (
     <motion.button
       type="button"
-      disabled={isLocked}
+      aria-disabled={isLocked}
       whileTap={isLocked ? undefined : { scale: 0.97 }}
-      onTap={() => {
+      onClick={(e) => {
+        e.preventDefault()
         if (!isLocked) {
           onSelect(category, label)
         }

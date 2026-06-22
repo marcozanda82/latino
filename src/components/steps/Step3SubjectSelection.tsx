@@ -214,7 +214,7 @@ export function Step3SubjectSelection({
 
       <DragOverlay dropAnimation={null}>
         {draggingTile ? (
-          <div className="draggable-item rounded-lg border border-slate-300 bg-white px-4 py-2.5 font-serif text-lg tracking-wide shadow-lg">
+          <div className="draggable-item rounded-xl border border-slate-300 bg-white px-5 py-3 font-serif text-lg tracking-wide shadow-2xl scale-105 transform">
             {draggingTile.word}
           </div>
         ) : null}

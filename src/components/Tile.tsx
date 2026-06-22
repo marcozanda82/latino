@@ -18,7 +18,7 @@ export function Tile({ id, word, status, disabled = false }: TileProps) {
     })
 
   const style = {
-    transform: CSS.Translate.toString(transform),
+    transform: CSS.Transform.toString(transform),
   }
 
   const isError = status === 'error'
@@ -32,7 +32,7 @@ export function Tile({ id, word, status, disabled = false }: TileProps) {
       initial={false}
       animate={
         isDragging
-          ? { scale: 1.05, x: 0 }
+          ? {}
           : isError
             ? { x: [0, -10, 10, -8, 8, -4, 4, 0], scale: 1 }
             : isPlaced
