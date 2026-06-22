@@ -26,6 +26,9 @@ interface Step1VerbSelectionProps {
   onAdvance?: () => void
 }
 
+const GENERIC_VERB_ERROR = 'Parola sbagliata. Riprova.'
+const MISTAKES_BEFORE_SOLUTION = 2
+
 function buildTiles(parole: string[]): TileData[] {
   return parole.map((word, index) => ({
     id: `tile-${index}-${word}`,
@@ -55,6 +58,7 @@ export function Step1VerbSelection({
   const [errorTileId, setErrorTileId] = useState<string | null>(null)
   const [draggingTileId, setDraggingTileId] = useState<string | null>(null)
   const [isComplete, setIsComplete] = useState(false)
+  const [mistakeCount, setMistakeCount] = useState(0)
 
   const sensors = useDragSensors()
 
@@ -90,9 +94,15 @@ export function Step1VerbSelection({
         setErrorTileId(null)
         setIsComplete(true)
       } else {
+        const nextMistakeCount = mistakeCount + 1
+        setMistakeCount(nextMistakeCount)
         setErrorTileId(tile.id)
         onMistake?.()
-        onError(analysis.step1_verbo.spiegazione_errore)
+        onError(
+          nextMistakeCount >= MISTAKES_BEFORE_SOLUTION
+            ? analysis.step1_verbo.spiegazione_errore
+            : GENERIC_VERB_ERROR,
+        )
         window.setTimeout(() => setErrorTileId(null), 600)
       }
     },
@@ -100,6 +110,7 @@ export function Step1VerbSelection({
       analysis.step1_verbo.parola_corretta,
       analysis.step1_verbo.spiegazione_errore,
       isComplete,
+      mistakeCount,
       onError,
       onMistake,
       tileById,
