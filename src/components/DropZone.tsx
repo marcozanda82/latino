@@ -1,10 +1,8 @@
-import { useDroppable } from '@dnd-kit/core'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Tile } from './Tile'
 import type { TileData } from '../types'
 
 interface DropZoneProps {
-  id: string
   label: string
   isActive: boolean
   isComplete: boolean
@@ -13,10 +11,10 @@ interface DropZoneProps {
   hidden?: boolean
   multi?: boolean
   emptyLabel?: string
+  onPlacedTileClick?: (tile: TileData) => void
 }
 
 export function DropZone({
-  id,
   label,
   placedTile = null,
   placedTiles,
@@ -25,9 +23,8 @@ export function DropZone({
   hidden = false,
   multi = false,
   emptyLabel,
+  onPlacedTileClick,
 }: DropZoneProps) {
-  const { setNodeRef, isOver } = useDroppable({ id, disabled: hidden || !isActive })
-
   const multiTiles = placedTiles ?? []
   const tiles =
     multiTiles.length > 0 ? multiTiles : placedTile ? [placedTile] : []
@@ -35,8 +32,10 @@ export function DropZone({
   const placeholder =
     emptyLabel ??
     (multi
-      ? 'Rilascia qui le parole del soggetto'
-      : 'Rilascia qui la parola corretta')
+      ? 'Tocca le parole del soggetto per aggiungerle qui'
+      : 'Tocca la parola corretta per posizionarla qui')
+
+  const canDeselect = isActive && !isComplete && Boolean(onPlacedTileClick)
 
   if (hidden) return null
 
@@ -48,29 +47,15 @@ export function DropZone({
       <h2 className="mb-4 text-base font-medium text-slate-700">{label}</h2>
 
       <motion.div
-        ref={setNodeRef}
         layout
         animate={{
-          borderColor: isComplete
-            ? '#34d399'
-            : isOver
-              ? '#94a3b8'
-              : isActive
-                ? '#cbd5e1'
-                : '#e2e8f0',
+          borderColor: isComplete ? '#34d399' : isActive ? '#cbd5e1' : '#e2e8f0',
           backgroundColor: isComplete
             ? 'rgba(236, 253, 245, 0.5)'
-            : isOver
-              ? 'rgba(248, 250, 252, 0.9)'
-              : 'transparent',
+            : 'transparent',
         }}
         transition={{ type: 'spring', stiffness: 300, damping: 28 }}
-        className={[
-          'flex min-h-[100px] flex-wrap items-center justify-center gap-3 rounded-lg border-2 border-dashed p-6 transition-colors',
-          isOver && !isComplete ? 'border-slate-400' : '',
-        ]
-          .filter(Boolean)
-          .join(' ')}
+        className="flex min-h-[100px] flex-wrap items-center justify-center gap-3 rounded-lg border-2 border-dashed p-6 transition-colors"
       >
         <AnimatePresence mode="popLayout">
           {tiles.length > 0 ? (
@@ -78,15 +63,33 @@ export function DropZone({
               <motion.div
                 key={tile.id}
                 layout
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.9 }}
+                initial={{ opacity: 0, scale: 0.88, y: 8 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.88, y: -8 }}
+                transition={{ type: 'spring', stiffness: 380, damping: 28 }}
               >
-                <Tile id={tile.id} word={tile.word} status="placed" disabled />
+                <Tile
+                  id={tile.id}
+                  word={tile.word}
+                  status="placed"
+                  disabled={!canDeselect}
+                  onClick={
+                    canDeselect
+                      ? () => onPlacedTileClick?.(tile)
+                      : undefined
+                  }
+                />
               </motion.div>
             ))
           ) : (
-            <p className="text-sm text-slate-400">{placeholder}</p>
+            <motion.p
+              key="placeholder"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="text-sm text-slate-400"
+            >
+              {placeholder}
+            </motion.p>
           )}
         </AnimatePresence>
       </motion.div>

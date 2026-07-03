@@ -5,19 +5,16 @@ interface ShelfProps {
   tiles: TileData[]
   placedTileIds: string[]
   errorTileId: string | null
-  draggingTileId: string | null
+  onTileClick?: (tile: TileData) => void
   title?: string
+  hint?: string
 }
 
 function getTileStatus(
   tileId: string,
-  placedTileIds: string[],
   errorTileId: string | null,
-  draggingTileId: string | null,
 ): TileStatus {
-  if (placedTileIds.includes(tileId)) return 'placed'
   if (errorTileId === tileId) return 'error'
-  if (draggingTileId === tileId) return 'dragging'
   return 'idle'
 }
 
@@ -25,8 +22,9 @@ export function Shelf({
   tiles,
   placedTileIds,
   errorTileId,
-  draggingTileId,
+  onTileClick,
   title = 'Parole rimanenti',
+  hint = 'Tocca per selezionare',
 }: ShelfProps) {
   const visibleTiles = tiles.filter((tile) => !placedTileIds.includes(tile.id))
 
@@ -37,12 +35,10 @@ export function Shelf({
           <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">
             Scaffalatura
           </p>
-          <h2 className="mt-1 text-base font-medium text-slate-700">
-            {title}
-          </h2>
+          <h2 className="mt-1 text-base font-medium text-slate-700">{title}</h2>
         </div>
         <span className="rounded-full bg-slate-200/70 px-3 py-1 text-xs font-medium text-slate-500">
-          Trascina le parole
+          {hint}
         </span>
       </div>
 
@@ -53,12 +49,8 @@ export function Shelf({
               key={tile.id}
               id={tile.id}
               word={tile.word}
-              status={getTileStatus(
-                tile.id,
-                placedTileIds,
-                errorTileId,
-                draggingTileId,
-              )}
+              status={getTileStatus(tile.id, errorTileId)}
+              onClick={onTileClick ? () => onTileClick(tile) : undefined}
             />
           ))
         ) : (

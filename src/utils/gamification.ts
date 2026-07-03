@@ -2,7 +2,10 @@ import type { LatinAnalysis } from '../types'
 
 export const XP_INITIAL = 1000
 
-export const XP_PENALTY_DRAG = 50
+export const XP_PENALTY_SELECTION = 50
+
+/** @deprecated Usa XP_PENALTY_SELECTION */
+export const XP_PENALTY_DRAG = XP_PENALTY_SELECTION
 export const XP_PENALTY_CHIP = 30
 export const XP_PENALTY_RETRY = 10
 

@@ -36,8 +36,8 @@ button {
   touch-action: manipulation;
 }
 
-.draggable-item {
-  touch-action: none;
+.word-tile {
+  touch-action: manipulation;
   -webkit-touch-callout: none;
 }
 

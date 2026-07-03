@@ -46,7 +46,7 @@ export interface TileData {
   index: number
 }
 
-export type TileStatus = 'idle' | 'dragging' | 'error' | 'placed'
+export type TileStatus = 'idle' | 'error' | 'placed'
 
 export interface DropZoneConfig {
   id: string

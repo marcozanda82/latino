@@ -1,23 +1,8 @@
-import {
-  DndContext,
-  DragOverlay,
-  type DragEndEvent,
-  type DragStartEvent,
-} from '@dnd-kit/core'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
 import { DropZone } from '../DropZone'
 import { Shelf } from '../Shelf'
-import {
-  DROP_ZONE_IDS,
-  SUBJECT_ERROR_MESSAGES,
-} from '../../constants/dropZones'
-import {
-  DRAG_MEASURING,
-  DRAG_OVERLAY_MODIFIERS,
-  DRAG_TILE_SURFACE_CLASS,
-} from '../../constants/dragAndDrop'
-import { useDragSensors } from '../../hooks/useDragSensors'
+import { SUBJECT_ERROR_MESSAGES } from '../../constants/dropZones'
 import type { LatinAnalysis, TileData } from '../../types'
 import { areWordSetsEqual, buildTilesFromWords } from '../../utils/tiles'
 
@@ -67,7 +52,6 @@ export function Step3SubjectSelection({
     initialPlacedTileIds,
   )
   const [errorTileId, setErrorTileId] = useState<string | null>(null)
-  const [draggingTileId, setDraggingTileId] = useState<string | null>(null)
   const [implicitSuccess, setImplicitSuccess] = useState(initialImplicitSuccess)
   const [implicitShaking, setImplicitShaking] = useState(false)
 
@@ -80,34 +64,17 @@ export function Step3SubjectSelection({
     .filter((tile): tile is TileData => Boolean(tile))
 
   const placedWords = placedTiles.map((tile) => tile.word)
-  const isDragComplete =
+  const isSelectionComplete =
     !implicitSuccess &&
     !isImplicitExpected &&
     areWordSetsEqual(placedWords, expectedWords)
 
-  const isComplete = implicitSuccess || isDragComplete
+  const isComplete = implicitSuccess || isSelectionComplete
 
-  const sensors = useDragSensors()
-
-  const draggingTile = draggingTileId ? tileById[draggingTileId] : null
-
-  const handleDragStart = useCallback((event: DragStartEvent) => {
-    if (implicitSuccess) return
-    setDraggingTileId(String(event.active.id))
-  }, [implicitSuccess])
-
-  const handleDragEnd = useCallback(
-    (event: DragEndEvent) => {
-      console.log('[DEBUG DROP] Drop completato. event.over:', event.over)
-      setDraggingTileId(null)
-
-      if (implicitSuccess) return
-
-      const { active, over } = event
-      if (!over || over.id !== DROP_ZONE_IDS.SUBJECT) return
-
-      const tile = tileById[String(active.id)]
-      if (!tile || placedTileIds.includes(tile.id)) return
+  const handlePoolTileClick = useCallback(
+    (tile: TileData) => {
+      if (implicitSuccess || isSelectionComplete) return
+      if (placedTileIds.includes(tile.id)) return
 
       if (isImplicitExpected) {
         setErrorTileId(tile.id)
@@ -142,15 +109,26 @@ export function Step3SubjectSelection({
       }
     },
     [
+      classroomMode,
       expectedWords,
       implicitSuccess,
       isImplicitExpected,
+      isSelectionComplete,
       onComplete,
       onError,
       onMistake,
       placedTileIds,
       tileById,
     ],
+  )
+
+  const handlePlacedTileClick = useCallback(
+    (tile: TileData) => {
+      if (implicitSuccess || isSelectionComplete) return
+      setPlacedTileIds((current) => current.filter((id) => id !== tile.id))
+      setErrorTileId(null)
+    },
+    [implicitSuccess, isSelectionComplete],
   )
 
   const handleImplicitClick = useCallback(() => {
@@ -172,91 +150,71 @@ export function Step3SubjectSelection({
   }, [classroomMode, isComplete, isImplicitExpected, onComplete, onError, onMistake])
 
   return (
-    <DndContext
-      sensors={sensors}
-      measuring={DRAG_MEASURING}
-      onDragStart={handleDragStart}
-      onDragEnd={handleDragEnd}
-    >
-      <div className="flex flex-col gap-6">
-        <Shelf
-          tiles={tiles}
-          placedTileIds={placedTileIds}
-          errorTileId={errorTileId}
-          draggingTileId={draggingTileId}
+    <div className="flex flex-col gap-6">
+      <Shelf
+        tiles={tiles}
+        placedTileIds={placedTileIds}
+        errorTileId={errorTileId}
+        onTileClick={handlePoolTileClick}
+        hint="Tocca le parole del soggetto"
+      />
+
+      <div className="flex flex-col gap-4">
+        <DropZone
+          label="Soggetto (Nominativo)"
+          placedTiles={placedTiles}
+          multi
+          isActive={!implicitSuccess && !isImplicitExpected}
+          isComplete={isSelectionComplete}
+          hidden={implicitSuccess}
+          onPlacedTileClick={handlePlacedTileClick}
         />
 
-        <div className="flex flex-col gap-4">
-          <DropZone
-            id={DROP_ZONE_IDS.SUBJECT}
-            label="Soggetto (Nominativo)"
-            placedTiles={placedTiles}
-            multi
-            isActive={!implicitSuccess && !isImplicitExpected}
-            isComplete={isDragComplete}
-            hidden={implicitSuccess}
-          />
-
-          <motion.button
-            type="button"
-            layout
-            disabled={isComplete}
-            whileTap={isComplete ? undefined : { scale: 0.98 }}
-            onClick={handleImplicitClick}
-            animate={
-              implicitShaking
-                ? { x: [0, -8, 8, -6, 6, -3, 3, 0] }
-                : { x: 0 }
-            }
-            transition={
-              implicitShaking
-                ? { duration: 0.45, ease: 'easeInOut' }
-                : { type: 'spring', stiffness: 320, damping: 26 }
-            }
-            className={[
-              'relative z-10 w-full cursor-pointer rounded-xl border px-6 py-4 text-sm font-medium transition-colors',
-              implicitSuccess
-                ? 'border-emerald-500 bg-emerald-500 text-white shadow-sm shadow-emerald-200'
-                : 'border-slate-200 bg-white text-slate-700 can-hover:hover:border-slate-300 can-hover:hover:bg-slate-50',
-              isComplete && !implicitSuccess
-                ? 'pointer-events-none opacity-40'
-                : '',
-            ]
-              .filter(Boolean)
-              .join(' ')}
-          >
-            Il Soggetto è Sottinteso
-          </motion.button>
-        </div>
-
-        <div className="flex items-center justify-between rounded-lg bg-slate-50 px-4 py-3">
-          <p className="text-xs text-slate-500">
-            {implicitSuccess
-              ? 'Soggetto sottinteso confermato.'
-              : isDragComplete
-                ? 'Soggetto individuato.'
-                : classroomMode
-                  ? 'Trascina le parole del soggetto o usa il pulsante sottinteso.'
-                  : isImplicitExpected
-                    ? 'Il soggetto non compare in frase: usa il pulsante dedicato.'
-                    : `Parole del soggetto: ${placedWords.length} di ${expectedWords.length}`}
-          </p>
-        </div>
+        <motion.button
+          type="button"
+          layout
+          disabled={isComplete}
+          whileTap={isComplete ? undefined : { scale: 0.98 }}
+          onClick={handleImplicitClick}
+          animate={
+            implicitShaking
+              ? { x: [0, -8, 8, -6, 6, -3, 3, 0] }
+              : { x: 0 }
+          }
+          transition={
+            implicitShaking
+              ? { duration: 0.45, ease: 'easeInOut' }
+              : { type: 'spring', stiffness: 320, damping: 26 }
+          }
+          className={[
+            'relative z-10 w-full cursor-pointer rounded-xl border px-6 py-4 text-sm font-medium transition-colors',
+            implicitSuccess
+              ? 'border-emerald-500 bg-emerald-500 text-white shadow-sm shadow-emerald-200'
+              : 'border-slate-200 bg-white text-slate-700 can-hover:hover:border-slate-300 can-hover:hover:bg-slate-50',
+            isComplete && !implicitSuccess
+              ? 'pointer-events-none opacity-40'
+              : '',
+          ]
+            .filter(Boolean)
+            .join(' ')}
+        >
+          Il Soggetto è Sottinteso
+        </motion.button>
       </div>
 
-      <DragOverlay
-        dropAnimation={null}
-        adjustScale={false}
-        modifiers={DRAG_OVERLAY_MODIFIERS}
-      >
-        {draggingTile ? (
-          <div
-            className={`${DRAG_TILE_SURFACE_CLASS} border-slate-300 bg-white text-slate-800 shadow-sm`}
-          >
-            {draggingTile.word}
-          </div>
-        ) : null}
-      </DragOverlay>
-    </DndContext>
+      <div className="flex items-center justify-between rounded-lg bg-slate-50 px-4 py-3">
+        <p className="text-xs text-slate-500">
+          {implicitSuccess
+            ? 'Soggetto sottinteso confermato.'
+            : isSelectionComplete
+              ? 'Soggetto individuato.'
+              : classroomMode
+                ? 'Seleziona le parole del soggetto o usa il pulsante sottinteso.'
+                : isImplicitExpected
+                  ? 'Il soggetto non compare in frase: usa il pulsante dedicato.'
+                  : `Parole del soggetto: ${placedWords.length} di ${expectedWords.length}`}
+        </p>
+      </div>
+    </div>
   )
 }

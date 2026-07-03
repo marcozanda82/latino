@@ -16,7 +16,7 @@ import {
   calculateFinalSesterziReward,
   XP_INITIAL,
   XP_PENALTY_CHIP,
-  XP_PENALTY_DRAG,
+  XP_PENALTY_SELECTION,
   XP_PENALTY_RETRY,
 } from '../utils/gamification'
 import type { LatinAnalysis } from '../types'
@@ -381,7 +381,7 @@ export function LatinTranslator({
                   analysis={analysis}
                   onVerbComplete={() => setStep1Complete(true)}
                   onError={showError}
-                  onMistake={() => handleStepMistake(XP_PENALTY_DRAG)}
+                  onMistake={() => handleStepMistake(XP_PENALTY_SELECTION)}
                   showAvantiButton={false}
                   classroomMode
                   initialPlacedTileId={step1Snapshot.placedTileId}
@@ -423,7 +423,7 @@ export function LatinTranslator({
                   analysis={analysis}
                   onComplete={() => setStep3Complete(true)}
                   onError={showError}
-                  onMistake={() => handleStepMistake(XP_PENALTY_DRAG)}
+                  onMistake={() => handleStepMistake(XP_PENALTY_SELECTION)}
                   classroomMode
                   initialPlacedTileIds={step3Snapshot.placedTileIds}
                   initialImplicitSuccess={step3Snapshot.implicitSuccess}
