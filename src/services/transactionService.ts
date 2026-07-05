@@ -1,11 +1,26 @@
 import {
+  getDoc,
+  increment,
   onSnapshot,
   orderBy,
   query,
+  writeBatch,
 } from 'firebase/firestore'
 import type { Timestamp } from 'firebase/firestore'
-import type { StudentTransaction } from '../types/transaction'
-import { getStudentTransactionsCollectionRef } from './studentFinancePaths'
+import { db } from '../config/firebase'
+import type {
+  StudentTransaction,
+  TransactionStatus,
+} from '../types/transaction'
+import {
+  getStudentDocRef,
+  getStudentTransactionDocRef,
+  getStudentTransactionsCollectionRef,
+} from './studentFinancePaths'
+
+function normalizeStatus(value: unknown): TransactionStatus {
+  return value === 'reverted' ? 'reverted' : 'active'
+}
 
 function mapDocToTransaction(
   id: string,
@@ -31,6 +46,7 @@ function mapDocToTransaction(
     amount,
     description,
     type,
+    status: normalizeStatus(data.status),
     timestamp: data.timestamp as Timestamp | undefined,
   }
 }
@@ -63,10 +79,6 @@ export function subscribeToTransactions(
   const unsubscribe = onSnapshot(
     transactionsQuery,
     (snapshot) => {
-      console.log(
-        '[transactionService] Transazioni caricate:',
-        snapshot.docs.length,
-      )
       callback(mapAndSortTransactions(snapshot.docs))
     },
     (error) => {
@@ -79,10 +91,6 @@ export function subscribeToTransactions(
       fallbackUnsubscribe = onSnapshot(
         collectionRef,
         (snapshot) => {
-          console.log(
-            '[transactionService] Transazioni caricate (fallback):',
-            snapshot.docs.length,
-          )
           callback(mapAndSortTransactions(snapshot.docs))
         },
         (fallbackError) => {
@@ -101,4 +109,51 @@ export function subscribeToTransactions(
     unsubscribe()
     fallbackUnsubscribe?.()
   }
+}
+
+export async function revertTransaction(
+  transactionId: string,
+  amount: number,
+): Promise<void> {
+  if (!transactionId.trim()) {
+    throw new Error('ID transazione mancante.')
+  }
+
+  if (!Number.isFinite(amount) || amount === 0) {
+    throw new Error('Importo transazione non valido.')
+  }
+
+  const txRef = getStudentTransactionDocRef(transactionId)
+  const snapshot = await getDoc(txRef)
+
+  if (!snapshot.exists()) {
+    throw new Error('Transazione non trovata.')
+  }
+
+  const storedAmount =
+    typeof snapshot.data()?.amount === 'number'
+      ? snapshot.data()?.amount
+      : Number(snapshot.data()?.amount)
+
+  if (!Number.isFinite(storedAmount) || storedAmount === 0) {
+    throw new Error('Importo transazione non valido.')
+  }
+
+  if (snapshot.data()?.status === 'reverted') {
+    throw new Error('Transazione già annullata.')
+  }
+
+  if (storedAmount !== amount) {
+    throw new Error('Importo transazione non coerente.')
+  }
+
+  const batch = writeBatch(db)
+  batch.update(getStudentDocRef(), {
+    balance: increment(-amount),
+  })
+  batch.update(txRef, {
+    status: 'reverted' satisfies TransactionStatus,
+  })
+
+  await batch.commit()
 }

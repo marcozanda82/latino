@@ -20,14 +20,16 @@ import { getExistingGroupNames } from '../utils/levelGroups'
 import { usePendingEvaluations } from '../hooks/usePendingEvaluations'
 import { TutorDashboard } from './TutorDashboard'
 import { TutorRewardsManager } from './TutorRewardsManager'
+import { TutorTransactionsManager } from './TutorTransactionsManager'
 import type { LatinAnalysis } from '../types'
 
-type AdminTab = 'esercizi' | 'obiettivi' | 'valutazioni'
+type AdminTab = 'esercizi' | 'obiettivi' | 'valutazioni' | 'economia'
 
 const TAB_LABELS: Record<AdminTab, string> = {
   esercizi: 'Esercizi',
   obiettivi: 'Premi Shop',
   valutazioni: 'Valutazioni',
+  economia: 'Gestione Economia',
 }
 
 export function AdminDashboard() {
@@ -176,7 +178,8 @@ export function AdminDashboard() {
             Plancia di comando
           </h1>
           <p className="mt-2 text-sm leading-relaxed text-slate-600">
-            Gestisci esercizi, premi shop, obiettivi settimanali e valutazioni.
+            Gestisci esercizi, premi shop, obiettivi settimanali, valutazioni ed
+            economia studente.
           </p>
           <button
             type="button"
@@ -190,7 +193,7 @@ export function AdminDashboard() {
     >
       <GlassCard className="mb-8 !p-2">
         <div className="flex flex-wrap gap-2">
-          {(['esercizi', 'obiettivi', 'valutazioni'] as AdminTab[]).map((tab) => (
+          {(['esercizi', 'obiettivi', 'valutazioni', 'economia'] as AdminTab[]).map((tab) => (
             <button
               key={tab}
               type="button"
@@ -222,6 +225,8 @@ export function AdminDashboard() {
       </GlassCard>
 
       <main className="space-y-8">
+        {activeTab === 'economia' && <TutorTransactionsManager />}
+
         {activeTab === 'valutazioni' && (
           <TutorDashboard
             evaluations={allEvaluations}

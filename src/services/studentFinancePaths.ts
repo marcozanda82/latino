@@ -29,3 +29,7 @@ export function getStudentTransactionsCollectionRef() {
 export function createStudentTransactionDocRef() {
   return doc(getStudentTransactionsCollectionRef())
 }
+
+export function getStudentTransactionDocRef(transactionId: string) {
+  return doc(getStudentTransactionsCollectionRef(), transactionId)
+}
