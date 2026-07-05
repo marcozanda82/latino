@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
+import { Lock } from 'lucide-react'
 import { useExercises } from '../context/ExerciseContext'
 import { AppLayout } from './layout/AppLayout'
 import { TutorPinModal } from './TutorPinModal'
@@ -27,6 +28,7 @@ import {
   filterLevelsWithoutSubmission,
   getSubmittedLevelIds,
 } from '../utils/studentEvaluations'
+import { isLevelLockedByTutor } from '../services/exerciseService'
 import { useStudentBalance } from '../hooks/useStudentBalance'
 import { RewardsShop } from './RewardsShop'
 import { StudentBankStatement } from './StudentBankStatement'
@@ -265,7 +267,8 @@ export function StudentHome() {
                           level.analysis,
                           level.customMaxReward,
                         )
-                        const isPlayable = isLevelUnlocked
+                        const tutorLocked = isLevelLockedByTutor(level)
+                        const isPlayable = isLevelUnlocked && !tutorLocked
 
                         const cardContent = (
                           <>
@@ -273,11 +276,19 @@ export function StudentHome() {
                               <p className="text-xs font-semibold uppercase tracking-widest text-slate-500">
                                 Livello {index + 1}
                               </p>
-                              {!isLevelUnlocked ? (
-                                <span className="text-xs text-slate-500">🔒</span>
-                              ) : null}
+                              <div className="flex shrink-0 items-center gap-2">
+                                {!isLevelUnlocked && !tutorLocked ? (
+                                  <span className="text-xs text-slate-500">🔒</span>
+                                ) : null}
+                              </div>
                             </div>
-                            <h3 className="mt-3 text-base font-semibold text-slate-800">
+                            <h3 className="mt-3 flex items-center gap-2 text-base font-semibold text-slate-800">
+                              {tutorLocked ? (
+                                <Lock
+                                  className="h-4 w-4 shrink-0 text-slate-500"
+                                  aria-hidden
+                                />
+                              ) : null}
                               {level.title}
                             </h3>
                             <p className="mt-2 font-serif text-sm italic leading-relaxed text-slate-600">
@@ -289,11 +300,17 @@ export function StudentHome() {
                                 💰 {maxReward.toLocaleString('it-IT')} Sesterzi
                               </span>
                             </p>
-                            <p className="mt-5 text-xs font-medium text-emerald-700">
-                              {!isLevelUnlocked ? (
+                            <p className="mt-5 text-xs font-medium">
+                              {tutorLocked ? (
+                                <span className="text-slate-500">
+                                  Bloccato dal Tutor
+                                </span>
+                              ) : !isLevelUnlocked ? (
                                 <span className="text-slate-500">Bloccato</span>
                               ) : (
-                                'Inizia'
+                                <span className="text-emerald-700">
+                                  Inizia traduzione
+                                </span>
                               )}
                             </p>
                           </>
@@ -301,9 +318,11 @@ export function StudentHome() {
 
                         const cardClassName = [
                           'block text-left transition-all duration-200',
-                          isPlayable
-                            ? 'hover:-translate-y-0.5 hover:shadow-lift active:scale-[0.98]'
-                            : 'cursor-not-allowed opacity-70',
+                          tutorLocked
+                            ? 'cursor-not-allowed opacity-50'
+                            : isPlayable
+                              ? 'hover:-translate-y-0.5 hover:shadow-lift active:scale-[0.98]'
+                              : 'cursor-not-allowed opacity-70',
                         ].join(' ')
 
                         return (
@@ -318,7 +337,15 @@ export function StudentHome() {
                                 <GlassCard className="!p-6">{cardContent}</GlassCard>
                               </Link>
                             ) : (
-                              <GlassCard className="!p-6" as="article">
+                              <GlassCard
+                                className={[
+                                  '!p-6',
+                                  tutorLocked ? 'bg-slate-100/90' : '',
+                                ]
+                                  .filter(Boolean)
+                                  .join(' ')}
+                                as="article"
+                              >
                                 {cardContent}
                               </GlassCard>
                             )}
