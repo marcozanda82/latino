@@ -15,7 +15,7 @@ import {
   updateSettings,
   type GamificationSettings,
 } from '../services/settingsService'
-import { updateLevelCompensation, updateGroupLock, updateLevelLock, isLevelLockedByTutor } from '../services/exerciseService'
+import { updateLevelCompensation, updateGroupLock, updateLevelLock, unlockAllLevels, isLevelLockedByTutor } from '../services/exerciseService'
 import { calculateMaxSesterziReward } from '../utils/gamification'
 import { getExistingGroupNames, groupLevelsByName } from '../utils/levelGroups'
 import { usePendingEvaluations } from '../hooks/usePendingEvaluations'
@@ -43,6 +43,7 @@ export function AdminDashboard() {
   const [savingCompId, setSavingCompId] = useState<string | null>(null)
   const [togglingLockId, setTogglingLockId] = useState<string | null>(null)
   const [togglingGroupName, setTogglingGroupName] = useState<string | null>(null)
+  const [unlockingAll, setUnlockingAll] = useState(false)
   const [activeTab, setActiveTab] = useState<AdminTab>('esercizi')
   const [pendingAnalysis, setPendingAnalysis] = useState<LatinAnalysis | null>(
     null,
@@ -165,6 +166,27 @@ export function AdminDashboard() {
       showError('Impossibile aggiornare i lucchetti del gruppo.')
     } finally {
       setTogglingGroupName(null)
+    }
+  }
+
+  const handleUnlockAllLevels = async () => {
+    const confirmed = window.confirm(
+      'Sbloccare TUTTI gli esercizi nel database?\n\nOgni documento in "levels" avrà isLocked: false.',
+    )
+    if (!confirmed) return
+
+    setUnlockingAll(true)
+    try {
+      const count = await unlockAllLevels()
+      showSuccess(
+        count > 0
+          ? `${count} esercizi sbloccati nel database.`
+          : 'Nessun esercizio trovato nel database.',
+      )
+    } catch {
+      showError('Impossibile sbloccare tutti gli esercizi.')
+    } finally {
+      setUnlockingAll(false)
     }
   }
 
@@ -366,6 +388,27 @@ export function AdminDashboard() {
 
         {activeTab === 'esercizi' && (
           <>
+            <GlassCard className="border-rose-200 bg-rose-50/80">
+              <p className="text-xs font-semibold uppercase tracking-widest text-rose-700">
+                Emergenza lucchetti
+              </p>
+              <p className="mt-2 text-sm text-rose-900">
+                Se degli esercizi restano bloccati lato studente, usa questo
+                tasto per impostare <code className="font-mono text-xs">isLocked: false</code>{' '}
+                su tutti i documenti della collezione.
+              </p>
+              <button
+                type="button"
+                onClick={handleUnlockAllLevels}
+                disabled={unlockingAll || saving}
+                className="mt-4 w-full cursor-pointer rounded-xl border-2 border-rose-600 bg-rose-600 px-6 py-4 text-sm font-bold uppercase tracking-wide text-white shadow-sm transition-colors can-hover:hover:bg-rose-700 disabled:opacity-60 sm:w-auto"
+              >
+                {unlockingAll
+                  ? 'Sblocco in corso…'
+                  : 'Sblocca tutto il database'}
+              </button>
+            </GlassCard>
+
             <GlassCard>
               <JsonLoader onLoadComplete={handleLoad} onError={showError} />
             </GlassCard>

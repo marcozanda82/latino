@@ -20,7 +20,7 @@ export interface Level {
   createdAt: string
   /** Compenso massimo fisso in Sesterzi (sovrascrive la formula) */
   customMaxReward?: number
-  /** Blocco esercizio controllato dal Tutor (default true sui nuovi) */
+  /** Blocco esercizio controllato dal Tutor (default false sui nuovi) */
   isLocked?: boolean
 }
 
@@ -120,7 +120,7 @@ export async function createLevel(
       groupName: normalizedGroupName,
       analysis,
       createdAt,
-      isLocked: true,
+      isLocked: false,
     })
 
     return {
@@ -129,7 +129,7 @@ export async function createLevel(
       groupName: normalizedGroupName,
       analysis,
       createdAt,
-      isLocked: true,
+      isLocked: false,
     }
   } catch (error) {
     console.error('[exerciseService] createLevel failed:', error)
@@ -225,4 +225,27 @@ export async function updateGroupLock(
   }
 
   await batch.commit()
+}
+
+const FIRESTORE_BATCH_LIMIT = 500
+
+/** Imposta isLocked: false su tutti i documenti della collezione levels. */
+export async function unlockAllLevels(): Promise<number> {
+  const snapshot = await getDocs(collection(db, LEVELS_COLLECTION))
+  const docs = snapshot.docs
+
+  if (docs.length === 0) return 0
+
+  for (let index = 0; index < docs.length; index += FIRESTORE_BATCH_LIMIT) {
+    const batch = writeBatch(db)
+    const chunk = docs.slice(index, index + FIRESTORE_BATCH_LIMIT)
+
+    for (const docSnap of chunk) {
+      batch.update(docSnap.ref, { isLocked: false })
+    }
+
+    await batch.commit()
+  }
+
+  return docs.length
 }
