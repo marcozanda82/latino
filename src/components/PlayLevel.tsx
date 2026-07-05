@@ -30,10 +30,6 @@ export function PlayLevel() {
           setNotFound(true)
           return
         }
-        if (result.isLocked === true) {
-          navigate('/', { replace: true })
-          return
-        }
         setLevel(result)
       })
       .finally(() => {

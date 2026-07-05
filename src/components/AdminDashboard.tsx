@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { Lock, Unlock } from 'lucide-react'
 import { JsonLoader } from './JsonLoader'
 import { useExercises } from '../context/ExerciseContext'
 import { AppLayout } from './layout/AppLayout'
@@ -15,7 +14,7 @@ import {
   updateSettings,
   type GamificationSettings,
 } from '../services/settingsService'
-import { updateLevelCompensation, updateGroupLock, updateLevelLock, unlockAllLevels, isLevelLockedByTutor } from '../services/exerciseService'
+import { updateLevelCompensation } from '../services/exerciseService'
 import { calculateMaxSesterziReward } from '../utils/gamification'
 import { getExistingGroupNames, groupLevelsByName } from '../utils/levelGroups'
 import { usePendingEvaluations } from '../hooks/usePendingEvaluations'
@@ -41,9 +40,6 @@ export function AdminDashboard() {
     Record<string, { coefficient: string; customMaxReward: string }>
   >({})
   const [savingCompId, setSavingCompId] = useState<string | null>(null)
-  const [togglingLockId, setTogglingLockId] = useState<string | null>(null)
-  const [togglingGroupName, setTogglingGroupName] = useState<string | null>(null)
-  const [unlockingAll, setUnlockingAll] = useState(false)
   const [activeTab, setActiveTab] = useState<AdminTab>('esercizi')
   const [pendingAnalysis, setPendingAnalysis] = useState<LatinAnalysis | null>(
     null,
@@ -125,68 +121,6 @@ export function AdminDashboard() {
       showError('Impossibile aggiornare il compenso.')
     } finally {
       setSavingCompId(null)
-    }
-  }
-
-  const handleToggleLevelLock = async (
-    levelId: string,
-    currentlyLocked: boolean,
-  ) => {
-    setTogglingLockId(levelId)
-    try {
-      await updateLevelLock(levelId, !currentlyLocked)
-      await refreshLevels()
-      showSuccess(
-        currentlyLocked
-          ? 'Esercizio sbloccato per lo studente.'
-          : 'Esercizio bloccato per lo studente.',
-      )
-    } catch {
-      showError('Impossibile aggiornare il lucchetto.')
-    } finally {
-      setTogglingLockId(null)
-    }
-  }
-
-  const handleToggleGroupLock = async (
-    groupName: string,
-    groupLevelIds: string[],
-    lockAll: boolean,
-  ) => {
-    setTogglingGroupName(groupName)
-    try {
-      await updateGroupLock(groupLevelIds, lockAll)
-      await refreshLevels()
-      showSuccess(
-        lockAll
-          ? `Tutti gli esercizi di "${groupName}" sono stati bloccati.`
-          : `Tutti gli esercizi di "${groupName}" sono stati sbloccati.`,
-      )
-    } catch {
-      showError('Impossibile aggiornare i lucchetti del gruppo.')
-    } finally {
-      setTogglingGroupName(null)
-    }
-  }
-
-  const handleUnlockAllLevels = async () => {
-    const confirmed = window.confirm(
-      'Sbloccare TUTTI gli esercizi nel database?\n\nOgni documento in "levels" avrà isLocked: false.',
-    )
-    if (!confirmed) return
-
-    setUnlockingAll(true)
-    try {
-      const count = await unlockAllLevels()
-      showSuccess(
-        count > 0
-          ? `${count} esercizi sbloccati nel database.`
-          : 'Nessun esercizio trovato nel database.',
-      )
-    } catch {
-      showError('Impossibile sbloccare tutti gli esercizi.')
-    } finally {
-      setUnlockingAll(false)
     }
   }
 
@@ -388,27 +322,6 @@ export function AdminDashboard() {
 
         {activeTab === 'esercizi' && (
           <>
-            <GlassCard className="border-rose-200 bg-rose-50/80">
-              <p className="text-xs font-semibold uppercase tracking-widest text-rose-700">
-                Emergenza lucchetti
-              </p>
-              <p className="mt-2 text-sm text-rose-900">
-                Se degli esercizi restano bloccati lato studente, usa questo
-                tasto per impostare <code className="font-mono text-xs">isLocked: false</code>{' '}
-                su tutti i documenti della collezione.
-              </p>
-              <button
-                type="button"
-                onClick={handleUnlockAllLevels}
-                disabled={unlockingAll || saving}
-                className="mt-4 w-full cursor-pointer rounded-xl border-2 border-rose-600 bg-rose-600 px-6 py-4 text-sm font-bold uppercase tracking-wide text-white shadow-sm transition-colors can-hover:hover:bg-rose-700 disabled:opacity-60 sm:w-auto"
-              >
-                {unlockingAll
-                  ? 'Sblocco in corso…'
-                  : 'Sblocca tutto il database'}
-              </button>
-            </GlassCard>
-
             <GlassCard>
               <JsonLoader onLoadComplete={handleLoad} onError={showError} />
             </GlassCard>
@@ -487,40 +400,15 @@ export function AdminDashboard() {
                 </p>
               ) : (
                 <div className="mt-5 space-y-8">
-                  {groupedSavedLevels.map((group) => {
-                    const allLocked = group.levels.every((level) =>
-                      isLevelLockedByTutor(level),
-                    )
-                    const groupLevelIds = group.levels.map((level) => level.id)
-                    const isGroupBusy = togglingGroupName === group.groupName
-
-                    return (
+                  {groupedSavedLevels.map((group) => (
                       <section
                         key={group.groupName}
                         className="rounded-xl border border-slate-200 bg-white/60 p-4"
                       >
-                        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                        <div className="mb-4">
                           <h3 className="font-serif text-lg font-semibold text-slate-800">
                             {group.groupName}
                           </h3>
-                          <button
-                            type="button"
-                            onClick={() =>
-                              handleToggleGroupLock(
-                                group.groupName,
-                                groupLevelIds,
-                                !allLocked,
-                              )
-                            }
-                            disabled={isGroupBusy || saving}
-                            className="cursor-pointer rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition-colors can-hover:hover:bg-slate-50 disabled:opacity-50"
-                          >
-                            {isGroupBusy
-                              ? 'Aggiornamento…'
-                              : allLocked
-                                ? 'Sblocca tutti'
-                                : 'Blocca tutti'}
-                          </button>
                         </div>
 
                         <ul className="space-y-4">
@@ -540,8 +428,6 @@ export function AdminDashboard() {
                                 ? Number(draft.customMaxReward)
                                 : level.customMaxReward,
                             )
-                            const locked = isLevelLockedByTutor(level)
-                            const isLockBusy = togglingLockId === level.id
 
                             return (
                               <li
@@ -549,53 +435,17 @@ export function AdminDashboard() {
                                 className="rounded-xl border border-slate-100 bg-slate-50 px-4 py-4"
                               >
                                 <div className="flex flex-wrap items-start justify-between gap-4">
-                                  <div className="flex min-w-0 flex-1 items-start gap-3">
-                                    <button
-                                      type="button"
-                                      onClick={() =>
-                                        handleToggleLevelLock(level.id, locked)
-                                      }
-                                      disabled={isLockBusy || saving}
-                                      aria-label={
-                                        locked
-                                          ? 'Sblocca esercizio'
-                                          : 'Blocca esercizio'
-                                      }
-                                      className={[
-                                        'mt-0.5 flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-lg border transition-colors disabled:opacity-50',
-                                        locked
-                                          ? 'border-rose-200 bg-rose-50 text-rose-600 can-hover:hover:bg-rose-100'
-                                          : 'border-emerald-200 bg-emerald-50 text-emerald-600 can-hover:hover:bg-emerald-100',
-                                      ].join(' ')}
-                                    >
-                                      {locked ? (
-                                        <Lock className="h-4 w-4" aria-hidden />
-                                      ) : (
-                                        <Unlock className="h-4 w-4" aria-hidden />
-                                      )}
-                                    </button>
-                                    <div className="min-w-0 flex-1">
-                                      <p className="truncate text-sm font-medium text-slate-800">
-                                        {level.title}
-                                      </p>
-                                      <p className="truncate font-serif text-xs italic text-slate-500">
-                                        {level.analysis.frase_originale}
-                                      </p>
-                                      <p className="mt-2 text-xs font-medium text-amber-800">
-                                        Valore max stimato:{' '}
-                                        {previewMax.toLocaleString('it-IT')} Sesterzi
-                                      </p>
-                                      <p
-                                        className={[
-                                          'mt-1 text-xs font-medium',
-                                          locked
-                                            ? 'text-rose-600'
-                                            : 'text-emerald-700',
-                                        ].join(' ')}
-                                      >
-                                        {locked ? 'Bloccato' : 'Sbloccato'}
-                                      </p>
-                                    </div>
+                                  <div className="min-w-0 flex-1">
+                                    <p className="truncate text-sm font-medium text-slate-800">
+                                      {level.title}
+                                    </p>
+                                    <p className="truncate font-serif text-xs italic text-slate-500">
+                                      {level.analysis.frase_originale}
+                                    </p>
+                                    <p className="mt-2 text-xs font-medium text-amber-800">
+                                      Valore max stimato:{' '}
+                                      {previewMax.toLocaleString('it-IT')} Sesterzi
+                                    </p>
                                   </div>
                                   <button
                                     type="button"
@@ -670,8 +520,7 @@ export function AdminDashboard() {
                           })}
                         </ul>
                       </section>
-                    )
-                  })}
+                    ))}
                 </div>
               )}
             </GlassCard>

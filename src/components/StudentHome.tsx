@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { Lock } from 'lucide-react'
 import { useExercises } from '../context/ExerciseContext'
 import { AppLayout } from './layout/AppLayout'
 import { TutorPinModal } from './TutorPinModal'
@@ -18,13 +17,11 @@ import {
 } from '../services/settingsService'
 import {
   groupLevelsByName,
-  isLevelUnlockedByEvaluation,
 } from '../utils/levelGroups'
 import { subscribeToStudentEvaluations } from '../services/firebaseEvaluations'
 import type { PendingTranslation } from '../types/evaluation'
 import { calculateMaxSesterziReward } from '../utils/gamification'
 import {
-  buildEvaluationByLevelId,
   filterLevelsWithoutSubmission,
   getSubmittedLevelIds,
 } from '../utils/studentEvaluations'
@@ -58,11 +55,6 @@ export function StudentHome() {
   const [activeTab, setActiveTab] = useState<StudentTab>('livelli')
   const { balance } = useStudentBalance()
 
-  const evaluationsByLevelId = useMemo(
-    () => buildEvaluationByLevelId(evaluations, levels),
-    [evaluations, levels],
-  )
-
   const submittedLevelIds = useMemo(
     () => getSubmittedLevelIds(evaluations, levels),
     [evaluations, levels],
@@ -74,11 +66,6 @@ export function StudentHome() {
   )
 
   const allGroupedLevels = useMemo(() => groupLevelsByName(levels), [levels])
-
-  const allFlatLevels = useMemo(
-    () => allGroupedLevels.flatMap((group) => group.levels),
-    [allGroupedLevels],
-  )
 
   const groupedLevels = useMemo(
     () =>
@@ -217,112 +204,20 @@ export function StudentHome() {
             </GlassCard>
           ) : (
             <div className="space-y-12">
-              {groupedLevels.map((group) => {
-                const firstVisibleLevel = group.levels[0]
-                const groupStartIndex = firstVisibleLevel
-                  ? allFlatLevels.findIndex(
-                      (level) => level.id === firstVisibleLevel.id,
-                    )
-                  : 0
-                const isGroupReachable = isLevelUnlockedByEvaluation(
-                  groupStartIndex,
-                  allFlatLevels,
-                  evaluationsByLevelId,
-                  group.groupName,
-                )
-
-                return (
+              {groupedLevels.map((group) => (
                   <section key={group.groupName}>
                     <div className="mb-5 flex items-center justify-between gap-3">
                       <h2 className="font-serif text-xl font-semibold text-slate-800 sm:text-2xl">
                         {group.groupName}
                       </h2>
-                      {!isGroupReachable && (
-                        <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600">
-                          🔒 Bloccato
-                        </span>
-                      )}
                     </div>
-
-                    {!isGroupReachable && (
-                      <p className="mb-5 text-sm leading-relaxed text-slate-600">
-                        Invia la traduzione del livello precedente per sbloccare i
-                        prossimi esercizi.
-                      </p>
-                    )}
 
                     <div className="grid gap-5 sm:grid-cols-2">
                       {group.levels.map((level, index) => {
-                        const globalIndex = allFlatLevels.findIndex(
-                          (item) => item.id === level.id,
-                        )
-                        const isLevelUnlocked = isLevelUnlockedByEvaluation(
-                          globalIndex,
-                          allFlatLevels,
-                          evaluationsByLevelId,
-                          group.groupName,
-                        )
                         const maxReward = calculateMaxSesterziReward(
                           level.analysis,
                           level.customMaxReward,
                         )
-                        const tutorLocked = level.isLocked === true
-                        const isPlayable = isLevelUnlocked && !tutorLocked
-
-                        const cardContent = (
-                          <>
-                            <div className="flex items-start justify-between gap-3">
-                              <p className="text-xs font-semibold uppercase tracking-widest text-slate-500">
-                                Livello {index + 1}
-                              </p>
-                              <div className="flex shrink-0 items-center gap-2">
-                                {!isLevelUnlocked && !tutorLocked ? (
-                                  <span className="text-xs text-slate-500">🔒</span>
-                                ) : null}
-                              </div>
-                            </div>
-                            <h3 className="mt-3 flex items-center gap-2 text-base font-semibold text-slate-800">
-                              {tutorLocked ? (
-                                <Lock
-                                  className="h-4 w-4 shrink-0 text-slate-500"
-                                  aria-hidden
-                                />
-                              ) : null}
-                              {level.title}
-                            </h3>
-                            <p className="mt-2 font-serif text-sm italic leading-relaxed text-slate-600">
-                              « {level.analysis.frase_originale} »
-                            </p>
-                            <p className="mt-3 text-xs font-medium text-slate-600">
-                              Valore massimo:{' '}
-                              <span className="font-bold text-yellow-600">
-                                💰 {maxReward.toLocaleString('it-IT')} Sesterzi
-                              </span>
-                            </p>
-                            <p className="mt-5 text-xs font-medium">
-                              {tutorLocked ? (
-                                <span className="text-slate-500">
-                                  Bloccato dal Tutor
-                                </span>
-                              ) : !isLevelUnlocked ? (
-                                <span className="text-slate-500">Bloccato</span>
-                              ) : (
-                                <span className="text-emerald-700">
-                                  Inizia traduzione
-                                </span>
-                              )}
-                            </p>
-                          </>
-                        )
-
-                        const cardClassName = [
-                          'block text-left transition-all duration-200',
-                          tutorLocked
-                            ? 'cursor-not-allowed opacity-50'
-                            : isPlayable
-                              ? 'hover:-translate-y-0.5 hover:shadow-lift active:scale-[0.98]'
-                              : 'cursor-not-allowed opacity-70',
-                        ].join(' ')
 
                         return (
                           <motion.div
@@ -331,30 +226,37 @@ export function StudentHome() {
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ delay: index * 0.05 }}
                           >
-                            {isPlayable ? (
-                              <Link to={`/play/${level.id}`} className={cardClassName}>
-                                <GlassCard className="!p-6">{cardContent}</GlassCard>
-                              </Link>
-                            ) : (
-                              <GlassCard
-                                className={[
-                                  '!p-6',
-                                  tutorLocked ? 'bg-slate-100/90' : '',
-                                ]
-                                  .filter(Boolean)
-                                  .join(' ')}
-                                as="article"
-                              >
-                                {cardContent}
+                            <Link
+                              to={`/play/${level.id}`}
+                              className="block text-left transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lift active:scale-[0.98]"
+                            >
+                              <GlassCard className="!p-6">
+                                <p className="text-xs font-semibold uppercase tracking-widest text-slate-500">
+                                  Livello {index + 1}
+                                </p>
+                                <h3 className="mt-3 text-base font-semibold text-slate-800">
+                                  {level.title}
+                                </h3>
+                                <p className="mt-2 font-serif text-sm italic leading-relaxed text-slate-600">
+                                  « {level.analysis.frase_originale} »
+                                </p>
+                                <p className="mt-3 text-xs font-medium text-slate-600">
+                                  Valore massimo:{' '}
+                                  <span className="font-bold text-yellow-600">
+                                    💰 {maxReward.toLocaleString('it-IT')} Sesterzi
+                                  </span>
+                                </p>
+                                <p className="mt-5 text-xs font-medium text-emerald-700">
+                                  Inizia traduzione
+                                </p>
                               </GlassCard>
-                            )}
+                            </Link>
                           </motion.div>
                         )
                       })}
                     </div>
                   </section>
-                )
-              })}
+                ))}
             </div>
           )}
         </>

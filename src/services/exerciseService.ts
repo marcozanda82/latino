@@ -7,7 +7,6 @@ import {
   getDocs,
   onSnapshot,
   updateDoc,
-  writeBatch,
 } from 'firebase/firestore'
 import { db } from '../config/firebase'
 import type { LatinAnalysis } from '../types'
@@ -20,27 +19,9 @@ export interface Level {
   createdAt: string
   /** Compenso massimo fisso in Sesterzi (sovrascrive la formula) */
   customMaxReward?: number
-  /** Blocco esercizio controllato dal Tutor (default false sui nuovi) */
-  isLocked?: boolean
 }
 
 const LEVELS_COLLECTION = 'levels'
-
-/** Retrocompatibilità: solo `true` (booleano) blocca; false/assente/stringhe → sbloccato. */
-export function isLevelLockedByTutor(level: Pick<Level, 'isLocked'>): boolean {
-  return level.isLocked === true
-}
-
-function parseIsLocked(value: unknown): boolean {
-  if (value === true) return true
-  if (value === false) return false
-  if (typeof value === 'string') {
-    const normalized = value.trim().toLowerCase()
-    if (normalized === 'true') return true
-    if (normalized === 'false') return false
-  }
-  return false
-}
 
 function mapDocToLevel(id: string, data: Record<string, unknown>): Level {
   const customMaxReward =
@@ -59,7 +40,6 @@ function mapDocToLevel(id: string, data: Record<string, unknown>): Level {
     analysis: data.analysis as LatinAnalysis,
     createdAt: data.createdAt as string,
     customMaxReward,
-    isLocked: parseIsLocked(data.isLocked),
   }
 }
 
@@ -120,7 +100,6 @@ export async function createLevel(
       groupName: normalizedGroupName,
       analysis,
       createdAt,
-      isLocked: false,
     })
 
     return {
@@ -129,7 +108,6 @@ export async function createLevel(
       groupName: normalizedGroupName,
       analysis,
       createdAt,
-      isLocked: false,
     }
   } catch (error) {
     console.error('[exerciseService] createLevel failed:', error)
@@ -193,59 +171,4 @@ export async function updateLevelCompensation(
   if (Object.keys(updates).length === 0) return
 
   await updateDoc(levelRef, updates)
-}
-
-export async function updateLevelLock(
-  id: string,
-  isLocked: boolean,
-): Promise<void> {
-  const levelRef = doc(db, LEVELS_COLLECTION, id)
-  const snapshot = await getDoc(levelRef)
-
-  if (!snapshot.exists()) {
-    throw new Error('Esercizio non trovato.')
-  }
-
-  const locked = isLocked === true
-
-  await updateDoc(levelRef, { isLocked: locked })
-}
-
-export async function updateGroupLock(
-  levelIds: string[],
-  isLocked: boolean,
-): Promise<void> {
-  if (levelIds.length === 0) return
-
-  const locked = isLocked === true
-  const batch = writeBatch(db)
-
-  for (const id of levelIds) {
-    batch.update(doc(db, LEVELS_COLLECTION, id), { isLocked: locked })
-  }
-
-  await batch.commit()
-}
-
-const FIRESTORE_BATCH_LIMIT = 500
-
-/** Imposta isLocked: false su tutti i documenti della collezione levels. */
-export async function unlockAllLevels(): Promise<number> {
-  const snapshot = await getDocs(collection(db, LEVELS_COLLECTION))
-  const docs = snapshot.docs
-
-  if (docs.length === 0) return 0
-
-  for (let index = 0; index < docs.length; index += FIRESTORE_BATCH_LIMIT) {
-    const batch = writeBatch(db)
-    const chunk = docs.slice(index, index + FIRESTORE_BATCH_LIMIT)
-
-    for (const docSnap of chunk) {
-      batch.update(docSnap.ref, { isLocked: false })
-    }
-
-    await batch.commit()
-  }
-
-  return docs.length
 }
