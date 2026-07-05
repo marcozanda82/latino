@@ -5,6 +5,7 @@ import {
   doc,
   getDoc,
   getDocs,
+  onSnapshot,
   updateDoc,
   writeBatch,
 } from 'firebase/firestore'
@@ -25,9 +26,20 @@ export interface Level {
 
 const LEVELS_COLLECTION = 'levels'
 
-/** Retrocompatibilità: assente o false → sbloccato. */
+/** Retrocompatibilità: solo `true` (booleano) blocca; false/assente/stringhe → sbloccato. */
 export function isLevelLockedByTutor(level: Pick<Level, 'isLocked'>): boolean {
   return level.isLocked === true
+}
+
+function parseIsLocked(value: unknown): boolean {
+  if (value === true) return true
+  if (value === false) return false
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase()
+    if (normalized === 'true') return true
+    if (normalized === 'false') return false
+  }
+  return false
 }
 
 function mapDocToLevel(id: string, data: Record<string, unknown>): Level {
@@ -47,8 +59,29 @@ function mapDocToLevel(id: string, data: Record<string, unknown>): Level {
     analysis: data.analysis as LatinAnalysis,
     createdAt: data.createdAt as string,
     customMaxReward,
-    isLocked: data.isLocked === true ? true : undefined,
+    isLocked: parseIsLocked(data.isLocked),
   }
+}
+
+export function subscribeToLevels(
+  callback: (levels: Level[]) => void,
+  onError?: (error: unknown) => void,
+): () => void {
+  return onSnapshot(
+    collection(db, LEVELS_COLLECTION),
+    (snapshot) => {
+      callback(
+        snapshot.docs.map((docSnap) =>
+          mapDocToLevel(docSnap.id, docSnap.data()),
+        ),
+      )
+    },
+    (error) => {
+      console.error('[exerciseService] subscribeToLevels failed:', error)
+      onError?.(error)
+      callback([])
+    },
+  )
 }
 
 export async function fetchLevels(): Promise<Level[]> {
@@ -173,7 +206,9 @@ export async function updateLevelLock(
     throw new Error('Esercizio non trovato.')
   }
 
-  await updateDoc(levelRef, { isLocked })
+  const locked = isLocked === true
+
+  await updateDoc(levelRef, { isLocked: locked })
 }
 
 export async function updateGroupLock(
@@ -182,10 +217,11 @@ export async function updateGroupLock(
 ): Promise<void> {
   if (levelIds.length === 0) return
 
+  const locked = isLocked === true
   const batch = writeBatch(db)
 
   for (const id of levelIds) {
-    batch.update(doc(db, LEVELS_COLLECTION, id), { isLocked })
+    batch.update(doc(db, LEVELS_COLLECTION, id), { isLocked: locked })
   }
 
   await batch.commit()

@@ -28,7 +28,6 @@ import {
   filterLevelsWithoutSubmission,
   getSubmittedLevelIds,
 } from '../utils/studentEvaluations'
-import { isLevelLockedByTutor } from '../services/exerciseService'
 import { useStudentBalance } from '../hooks/useStudentBalance'
 import { RewardsShop } from './RewardsShop'
 import { StudentBankStatement } from './StudentBankStatement'
@@ -267,7 +266,7 @@ export function StudentHome() {
                           level.analysis,
                           level.customMaxReward,
                         )
-                        const tutorLocked = isLevelLockedByTutor(level)
+                        const tutorLocked = level.isLocked === true
                         const isPlayable = isLevelUnlocked && !tutorLocked
 
                         const cardContent = (

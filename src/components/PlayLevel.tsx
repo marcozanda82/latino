@@ -4,7 +4,7 @@ import { LatinTranslator } from './LatinTranslator'
 import { AppLayout } from './layout/AppLayout'
 import { PlayLevelSkeleton } from './ui/Skeletons'
 import { GlassCard } from './ui/GlassCard'
-import { fetchLevelById, isLevelLockedByTutor, type Level } from '../services/exerciseService'
+import { fetchLevelById, type Level } from '../services/exerciseService'
 import { subscribeToStudentEvaluations } from '../services/firebaseEvaluations'
 
 export function PlayLevel() {
@@ -30,7 +30,7 @@ export function PlayLevel() {
           setNotFound(true)
           return
         }
-        if (isLevelLockedByTutor(result)) {
+        if (result.isLocked === true) {
           navigate('/', { replace: true })
           return
         }

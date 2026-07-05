@@ -12,6 +12,7 @@ import {
   createLevel,
   deleteLevel,
   fetchLevels,
+  subscribeToLevels,
   type Level,
 } from '../services/exerciseService'
 
@@ -41,35 +42,43 @@ export function ExerciseProvider({ children }: { children: ReactNode }) {
   }, [])
 
   useEffect(() => {
-    refreshLevels().finally(() => setLoading(false))
-  }, [refreshLevels])
+    setLoading(true)
+
+    const unsubscribe = subscribeToLevels(
+      (data) => {
+        setLevels(data)
+        setLoading(false)
+      },
+      (error) => {
+        console.error('[ExerciseContext] subscribeToLevels failed:', error)
+        setLoading(false)
+      },
+    )
+
+    return unsubscribe
+  }, [])
 
   const addLevel = useCallback(
     async (title: string, analysis: LatinAnalysis, groupName: string) => {
       setSaving(true)
       try {
         const level = await createLevel(title, analysis, groupName)
-        await refreshLevels()
         return level
       } finally {
         setSaving(false)
       }
     },
-    [refreshLevels],
+    [],
   )
 
-  const removeLevel = useCallback(
-    async (id: string) => {
-      setSaving(true)
-      try {
-        await deleteLevel(id)
-        await refreshLevels()
-      } finally {
-        setSaving(false)
-      }
-    },
-    [refreshLevels],
-  )
+  const removeLevel = useCallback(async (id: string) => {
+    setSaving(true)
+    try {
+      await deleteLevel(id)
+    } finally {
+      setSaving(false)
+    }
+  }, [])
 
   const value = useMemo(
     () => ({
