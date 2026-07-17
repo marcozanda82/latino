@@ -255,6 +255,17 @@ export function StudentArchive() {
                 </p>
               </div>
 
+              {selected.freeTranslation ? (
+                <div className="rounded-xl border border-sky-200 bg-sky-50/80 px-5 py-4">
+                  <p className="text-xs font-semibold uppercase tracking-widest text-sky-700">
+                    Traduzione Fluida dello Studente
+                  </p>
+                  <p className="mt-3 font-serif text-lg italic leading-relaxed text-slate-800">
+                    {selected.freeTranslation}
+                  </p>
+                </div>
+              ) : null}
+
               <div className="flex flex-wrap gap-3 border-t border-slate-100 pt-4 text-sm text-slate-600">
                 <span>Punteggio: {selected.totalScore ?? selected.mechanicalScore}/100</span>
                 {typeof selected.reward === 'number' && selected.reward > 0 ? (

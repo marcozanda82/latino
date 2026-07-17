@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { motion } from 'framer-motion'
 import { GlassCard } from './ui/GlassCard'
 import type { LatinAnalysis } from '../types'
@@ -24,7 +24,7 @@ interface FinalReviewPanelProps {
   earnedSesterzi: number | null
   wasAutoApproved?: boolean
   onEditStep: (step: AppStep) => void
-  onSubmit: () => void
+  onSubmit: (freeTranslation: string) => void
   onBackToLevels: () => void
 }
 
@@ -57,6 +57,8 @@ export function FinalReviewPanel({
   onSubmit,
   onBackToLevels,
 }: FinalReviewPanelProps) {
+  const [freeTranslation, setFreeTranslation] = useState('')
+
   const placedVerb = step1PlacedTileId
     ? wordFromTileId(step1PlacedTileId)
     : '—'
@@ -182,6 +184,38 @@ export function FinalReviewPanel({
           </p>
         </div>
 
+        {!isSubmitted ? (
+          <div className="rounded-lg border border-violet-200 bg-violet-50/70 px-4 py-4">
+            <label
+              htmlFor="free-translation"
+              className="text-sm font-semibold text-violet-900"
+            >
+              Resa in italiano (Bella copia)
+            </label>
+            <p className="mt-1 text-xs text-violet-800/80">
+              Opzionale — riscrivi la frase in un italiano più naturale, senza
+              alterare la traduzione letterale sopra.
+            </p>
+            <textarea
+              id="free-translation"
+              value={freeTranslation}
+              onChange={(event) => setFreeTranslation(event.target.value)}
+              placeholder="Riscrivi la frase in un italiano fluido e corretto..."
+              rows={4}
+              className="mt-3 w-full resize-y rounded-lg border border-violet-200 bg-white px-4 py-3 text-sm leading-relaxed text-slate-800 outline-none transition-shadow placeholder:text-slate-400 focus:border-violet-400 focus:ring-2 focus:ring-violet-200"
+            />
+          </div>
+        ) : freeTranslation.trim() ? (
+          <div className="rounded-lg border border-violet-200 bg-violet-50/70 px-4 py-4">
+            <p className="text-xs font-semibold uppercase tracking-widest text-violet-800">
+              Resa in italiano (Bella copia)
+            </p>
+            <p className="mt-2 font-serif text-base italic leading-relaxed text-slate-800">
+              {freeTranslation.trim()}
+            </p>
+          </div>
+        ) : null}
+
         <div className="flex flex-wrap gap-3 border-t border-slate-200 pt-4 text-sm text-slate-600">
           <span>XP: {score}</span>
           <span>Analisi meccanica: {mechanicalScore}/60</span>
@@ -192,7 +226,7 @@ export function FinalReviewPanel({
         <div className="flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
           <button
             type="button"
-            onClick={onSubmit}
+            onClick={() => onSubmit(freeTranslation)}
             disabled={isSubmitting || !studentFullTranslation.trim()}
             className="min-h-11 cursor-pointer rounded-lg border border-sky-600 bg-sky-600 px-8 py-3 text-sm font-semibold text-white shadow-sm transition-all can-hover:hover:bg-sky-700 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-200 disabled:text-slate-400"
           >

@@ -224,6 +224,17 @@ export function TutorDashboard({
                     </div>
                   </div>
 
+                  {item.freeTranslation ? (
+                    <div className="mt-5 rounded-xl border border-sky-200 bg-sky-50/80 px-5 py-4">
+                      <p className="text-xs font-semibold uppercase tracking-widest text-sky-700">
+                        Traduzione Fluida dello Studente
+                      </p>
+                      <p className="mt-3 font-serif text-lg italic leading-relaxed text-slate-800">
+                        {item.freeTranslation}
+                      </p>
+                    </div>
+                  ) : null}
+
                   {isPending ? (
                     <div className="mt-5 flex flex-wrap gap-3">
                       {EVALUATION_ACTIONS.map((action) => (

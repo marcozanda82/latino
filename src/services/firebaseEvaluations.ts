@@ -81,6 +81,11 @@ function mapDocToPendingTranslation(
     totalScore:
       typeof data.totalScore === 'number' ? data.totalScore : undefined,
     autoApproved: data.autoApproved === true,
+    freeTranslation:
+      typeof data.freeTranslation === 'string' &&
+      data.freeTranslation.trim()
+        ? data.freeTranslation.trim()
+        : undefined,
     status,
     createdAt: data.createdAt as Timestamp | undefined,
   }
@@ -127,6 +132,9 @@ export async function submitTranslationForReview(
       autoApproved,
       bonusScore: autoApproved ? 40 : null,
       totalScore: autoApproved ? 100 : null,
+      ...(data.freeTranslation?.trim()
+        ? { freeTranslation: data.freeTranslation.trim() }
+        : {}),
       createdAt: serverTimestamp(),
     })
 

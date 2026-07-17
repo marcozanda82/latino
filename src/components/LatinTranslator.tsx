@@ -164,7 +164,7 @@ export function LatinTranslator({
     [studentCoreTranslation, studentComplementTranslations],
   )
 
-  const handleSubmitToTutor = async () => {
+  const handleSubmitToTutor = async (freeTranslation = '') => {
     if (!studentFullTranslation.trim() || isSubmitting || isSubmitted) return
 
     setIsSubmitting(true)
@@ -209,6 +209,7 @@ export function LatinTranslator({
         mechanicalScore,
         reward,
         autoApproved,
+        freeTranslation: freeTranslation.trim() || undefined,
       })
       if (levelId) {
         await deleteExerciseDraft(levelId)

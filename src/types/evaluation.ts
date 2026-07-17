@@ -21,6 +21,8 @@ export interface PendingTranslation {
   bonusScore?: number
   totalScore?: number
   autoApproved?: boolean
+  /** Resa in italiano fluida (bella copia), opzionale */
+  freeTranslation?: string
   createdAt?: Timestamp
 }
 
