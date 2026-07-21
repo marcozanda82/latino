@@ -14,7 +14,7 @@ import {
   updateSettings,
   type GamificationSettings,
 } from '../services/settingsService'
-import { updateLevelCompensation } from '../services/exerciseService'
+import { updateLevelCompensation, isSentenceLevel, isVersionLevel, getLevelPreviewText } from '../services/exerciseService'
 import { calculateMaxSesterziReward } from '../utils/gamification'
 import { getExistingGroupNames, groupLevelsByName } from '../utils/levelGroups'
 import { usePendingEvaluations } from '../hooks/usePendingEvaluations'
@@ -22,8 +22,14 @@ import { TutorDashboard } from './TutorDashboard'
 import { TutorRewardsManager } from './TutorRewardsManager'
 import { TutorTransactionsManager } from './TutorTransactionsManager'
 import type { LatinAnalysis } from '../types'
+import type { VersionExercise } from '../types/version'
+import {
+  parseVersionExerciseJson,
+  VersionJsonLoadError,
+} from '../utils/validateVersionExercise'
 
 type AdminTab = 'esercizi' | 'obiettivi' | 'valutazioni' | 'economia'
+type CreateContentType = 'sentence' | 'version'
 
 const TAB_LABELS: Record<AdminTab, string> = {
   esercizi: 'Esercizi',
@@ -32,18 +38,35 @@ const TAB_LABELS: Record<AdminTab, string> = {
   economia: 'Gestione Economia',
 }
 
+const VERSION_JSON_PLACEHOLDER = `{
+  "titolo": "La battaglia di Maratona",
+  "tipo": "version",
+  "autore": "Cornelio Nepote",
+  "introduzione": "Testo introduttivo...",
+  "segmenti": [
+    { "id": 1, "latino": "Testo latino 1...", "note": "Nota opzionale" },
+    { "id": 2, "latino": "Testo latino 2...", "note": "" }
+  ]
+}`
+
 export function AdminDashboard() {
   const navigate = useNavigate()
-  const { levels, loading, saving, addLevel, removeLevel, refreshLevels } =
+  const { levels, loading, saving, addLevel, addVersionLevel, removeLevel, refreshLevels } =
     useExercises()
   const [compDrafts, setCompDrafts] = useState<
     Record<string, { coefficient: string; customMaxReward: string }>
   >({})
   const [savingCompId, setSavingCompId] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<AdminTab>('esercizi')
+  const [createType, setCreateType] = useState<CreateContentType>('sentence')
   const [pendingAnalysis, setPendingAnalysis] = useState<LatinAnalysis | null>(
     null,
   )
+  const [pendingVersion, setPendingVersion] = useState<VersionExercise | null>(
+    null,
+  )
+  const [versionJsonText, setVersionJsonText] = useState('')
+  const [versionMaxReward, setVersionMaxReward] = useState('')
   const [title, setTitle] = useState('')
   const [groupName, setGroupName] = useState('Settimana 1')
   const [settings, setSettings] = useState<GamificationSettings>(
@@ -51,8 +74,15 @@ export function AdminDashboard() {
   )
   const [settingsLoading, setSettingsLoading] = useState(true)
   const [settingsSaving, setSettingsSaving] = useState(false)
-  const { pendingCount, evaluatingId, resettingId, allEvaluations, handleEvaluate, handleReset } =
-    usePendingEvaluations()
+  const {
+    pendingCount,
+    evaluatingId,
+    resettingId,
+    allEvaluations,
+    handleEvaluate,
+    handleApproveVersion,
+    handleReset,
+  } = usePendingEvaluations()
 
   const existingGroupNames = useMemo(
     () => getExistingGroupNames(levels),
@@ -76,7 +106,9 @@ export function AdminDashboard() {
         levels.map((level) => [
           level.id,
           {
-            coefficient: String(level.analysis.coefficiente ?? 1),
+            coefficient: isSentenceLevel(level)
+              ? String(level.analysis.coefficiente ?? 1)
+              : '1',
             customMaxReward:
               level.customMaxReward !== undefined
                 ? String(level.customMaxReward)
@@ -91,12 +123,17 @@ export function AdminDashboard() {
     const draft = compDrafts[levelId]
     if (!draft) return
 
+    const level = levels.find((item) => item.id === levelId)
     const coefficient = Number(draft.coefficient)
     const customMaxReward = draft.customMaxReward.trim()
       ? Number(draft.customMaxReward)
       : null
 
-    if (!Number.isFinite(coefficient) || coefficient < 0) {
+    if (
+      level &&
+      isSentenceLevel(level) &&
+      (!Number.isFinite(coefficient) || coefficient < 0)
+    ) {
       showError('Coefficiente non valido.')
       return
     }
@@ -112,7 +149,7 @@ export function AdminDashboard() {
     setSavingCompId(levelId)
     try {
       await updateLevelCompensation(levelId, {
-        coefficient,
+        ...(level && isSentenceLevel(level) ? { coefficient } : {}),
         customMaxReward,
       })
       await refreshLevels()
@@ -125,12 +162,38 @@ export function AdminDashboard() {
   }
 
   const handleLoad = (analysis: LatinAnalysis) => {
+    setPendingVersion(null)
     setPendingAnalysis(analysis)
     setTitle(
       analysis.frase_originale.length > 48
         ? `${analysis.frase_originale.slice(0, 48)}…`
         : analysis.frase_originale,
     )
+  }
+
+  const handleCreateTypeChange = (next: CreateContentType) => {
+    setCreateType(next)
+    setPendingAnalysis(null)
+    setPendingVersion(null)
+    setTitle('')
+    setVersionJsonText('')
+    setVersionMaxReward('')
+  }
+
+  const handleLoadVersion = () => {
+    try {
+      const version = parseVersionExerciseJson(versionJsonText)
+      setPendingAnalysis(null)
+      setPendingVersion(version)
+      setTitle(version.titolo)
+      showSuccess('JSON versione validato. Controlla e salva.')
+    } catch (error) {
+      const message =
+        error instanceof VersionJsonLoadError
+          ? error.message
+          : 'Errore: Il file JSON non ha il formato corretto per la versione'
+      showError(message)
+    }
   }
 
   const handleSave = async () => {
@@ -143,6 +206,37 @@ export function AdminDashboard() {
       showSuccess('Esercizio salvato con successo!')
     } catch {
       showError('Errore durante il salvataggio. Riprova.')
+    }
+  }
+
+  const handleSaveVersion = async () => {
+    if (!pendingVersion || !groupName.trim()) return
+
+    const customMaxReward = versionMaxReward.trim()
+      ? Number(versionMaxReward)
+      : undefined
+
+    if (
+      customMaxReward !== undefined &&
+      (!Number.isFinite(customMaxReward) || customMaxReward < 0)
+    ) {
+      showError('Compenso massimo non valido.')
+      return
+    }
+
+    try {
+      const versionToSave: VersionExercise = {
+        ...pendingVersion,
+        titolo: title.trim() || pendingVersion.titolo,
+      }
+      await addVersionLevel(versionToSave, groupName, customMaxReward)
+      setPendingVersion(null)
+      setVersionJsonText('')
+      setVersionMaxReward('')
+      setTitle('')
+      showSuccess('Versione salvata con successo!')
+    } catch {
+      showError('Errore durante il salvataggio della versione. Riprova.')
     }
   }
 
@@ -238,6 +332,7 @@ export function AdminDashboard() {
             evaluatingId={evaluatingId}
             resettingId={resettingId}
             onEvaluate={handleEvaluate}
+            onApproveVersion={handleApproveVersion}
             onReset={handleReset}
           />
         )}
@@ -323,10 +418,71 @@ export function AdminDashboard() {
         {activeTab === 'esercizi' && (
           <>
             <GlassCard>
-              <JsonLoader onLoadComplete={handleLoad} onError={showError} />
+              <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">
+                Nuovo contenuto
+              </p>
+              <h2 className="mt-1 text-lg font-semibold text-slate-800">
+                Tipo di esercizio
+              </h2>
+              <div className="mt-4 flex gap-2">
+                {(
+                  [
+                    { id: 'sentence', label: 'Frase Singola' },
+                    { id: 'version', label: 'Versione' },
+                  ] as const
+                ).map((option) => (
+                  <button
+                    key={option.id}
+                    type="button"
+                    onClick={() => handleCreateTypeChange(option.id)}
+                    className={[
+                      'flex-1 rounded-xl px-4 py-3 text-sm font-medium transition-colors',
+                      createType === option.id
+                        ? 'bg-slate-800 text-white shadow-sm'
+                        : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50',
+                    ].join(' ')}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
             </GlassCard>
 
-            {pendingAnalysis && (
+            {createType === 'sentence' ? (
+              <GlassCard>
+                <JsonLoader onLoadComplete={handleLoad} onError={showError} />
+              </GlassCard>
+            ) : (
+              <GlassCard>
+                <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">
+                  Import JSON
+                </p>
+                <h2 className="mt-1 text-base font-medium text-slate-700">
+                  Incolla il JSON della versione
+                </h2>
+                <p className="mt-2 text-sm text-slate-500">
+                  Deve includere titolo, autore, introduzione e l&apos;array
+                  segmenti.
+                </p>
+                <textarea
+                  value={versionJsonText}
+                  onChange={(event) => setVersionJsonText(event.target.value)}
+                  rows={14}
+                  placeholder={VERSION_JSON_PLACEHOLDER}
+                  className="mt-4 w-full resize-y rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 font-mono text-sm text-slate-800 shadow-sm outline-none transition-colors placeholder:text-slate-400 focus:border-slate-400 focus:bg-white"
+                />
+                <button
+                  type="button"
+                  onClick={handleLoadVersion}
+                  disabled={!versionJsonText.trim()}
+                  className="mt-4 w-full rounded-lg bg-indigo-600 px-6 py-3 text-sm font-medium text-white shadow-sm transition-all hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400"
+                >
+                  Carica Versione
+                </button>
+              </GlassCard>
+            )}
+
+            {pendingAnalysis && createType === 'sentence' && (
               <motion.div
                 initial={{ opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -366,7 +522,7 @@ export function AdminDashboard() {
                     list="existing-groups"
                     value={groupName}
                     onChange={(event) => setGroupName(event.target.value)}
-                    placeholder='Es. Settimana 1: Gallia'
+                    placeholder="Es. Settimana 1: Gallia"
                     className="mt-2 w-full rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-800 outline-none focus:border-slate-400 focus:bg-white"
                   />
                   <datalist id="existing-groups">
@@ -382,6 +538,105 @@ export function AdminDashboard() {
                     className="mt-4 rounded-lg bg-slate-800 px-6 py-3 text-sm font-medium text-white shadow-sm transition-all hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400"
                   >
                     {saving ? 'Salvataggio...' : 'Salva Esercizio'}
+                  </button>
+                </GlassCard>
+              </motion.div>
+            )}
+
+            {pendingVersion && createType === 'version' && (
+              <motion.div
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+              >
+                <GlassCard>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h2 className="text-lg font-semibold text-slate-800">
+                      Anteprima versione
+                    </h2>
+                    <span className="rounded-full border border-indigo-200 bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-700">
+                      {pendingVersion.segmenti.length} segmenti
+                    </span>
+                  </div>
+                  <p className="mt-2 text-sm font-medium text-slate-600">
+                    {pendingVersion.autore}
+                  </p>
+                  <p className="mt-3 text-sm leading-relaxed text-slate-700">
+                    {pendingVersion.introduzione}
+                  </p>
+                  <ul className="mt-4 space-y-2">
+                    {pendingVersion.segmenti.slice(0, 3).map((segment) => (
+                      <li
+                        key={segment.id}
+                        className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 font-serif text-sm text-slate-700"
+                      >
+                        {segment.latino}
+                      </li>
+                    ))}
+                    {pendingVersion.segmenti.length > 3 ? (
+                      <li className="text-xs text-slate-500">
+                        …e altri {pendingVersion.segmenti.length - 3} segmenti
+                      </li>
+                    ) : null}
+                  </ul>
+
+                  <label
+                    htmlFor="version-title"
+                    className="mt-4 block text-sm font-medium text-slate-700"
+                  >
+                    Titolo
+                  </label>
+                  <input
+                    id="version-title"
+                    type="text"
+                    value={title}
+                    onChange={(event) => setTitle(event.target.value)}
+                    className="mt-2 w-full rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-800 outline-none focus:border-slate-400 focus:bg-white"
+                  />
+
+                  <label
+                    htmlFor="version-group-name"
+                    className="mt-4 block text-sm font-medium text-slate-700"
+                  >
+                    Settimana / Mondo
+                  </label>
+                  <input
+                    id="version-group-name"
+                    type="text"
+                    list="existing-groups-version"
+                    value={groupName}
+                    onChange={(event) => setGroupName(event.target.value)}
+                    placeholder="Es. Settimana 1: Gallia"
+                    className="mt-2 w-full rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-800 outline-none focus:border-slate-400 focus:bg-white"
+                  />
+                  <datalist id="existing-groups-version">
+                    {existingGroupNames.map((name) => (
+                      <option key={name} value={name} />
+                    ))}
+                  </datalist>
+
+                  <label
+                    htmlFor="version-max-reward"
+                    className="mt-4 block text-sm font-medium text-slate-700"
+                  >
+                    Compenso max suggerito (Sesterzi)
+                  </label>
+                  <input
+                    id="version-max-reward"
+                    type="number"
+                    min={0}
+                    value={versionMaxReward}
+                    onChange={(event) => setVersionMaxReward(event.target.value)}
+                    placeholder="Opzionale"
+                    className="mt-2 w-full rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-800 outline-none focus:border-slate-400 focus:bg-white"
+                  />
+
+                  <button
+                    type="button"
+                    onClick={handleSaveVersion}
+                    disabled={!title.trim() || !groupName.trim() || saving}
+                    className="mt-4 rounded-lg bg-indigo-600 px-6 py-3 text-sm font-medium text-white shadow-sm transition-all hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400"
+                  >
+                    {saving ? 'Salvataggio...' : 'Salva Versione'}
                   </button>
                 </GlassCard>
               </motion.div>
@@ -414,20 +669,27 @@ export function AdminDashboard() {
                         <ul className="space-y-4">
                           {group.levels.map((level) => {
                             const draft = compDrafts[level.id] ?? {
-                              coefficient: String(
-                                level.analysis.coefficiente ?? 1,
-                              ),
+                              coefficient: isSentenceLevel(level)
+                                ? String(level.analysis.coefficiente ?? 1)
+                                : '1',
                               customMaxReward:
                                 level.customMaxReward !== undefined
                                   ? String(level.customMaxReward)
                                   : '',
                             }
-                            const previewMax = calculateMaxSesterziReward(
-                              level.analysis,
-                              draft.customMaxReward.trim()
+                            const previewMax = isSentenceLevel(level)
+                              ? calculateMaxSesterziReward(
+                                  level.analysis,
+                                  draft.customMaxReward.trim()
+                                    ? Number(draft.customMaxReward)
+                                    : level.customMaxReward,
+                                )
+                              : draft.customMaxReward.trim()
                                 ? Number(draft.customMaxReward)
-                                : level.customMaxReward,
-                            )
+                                : (level.customMaxReward ?? 0)
+                            const segmentCount = isVersionLevel(level)
+                              ? level.version.segmenti.length
+                              : null
 
                             return (
                               <li
@@ -436,11 +698,35 @@ export function AdminDashboard() {
                               >
                                 <div className="flex flex-wrap items-start justify-between gap-4">
                                   <div className="min-w-0 flex-1">
-                                    <p className="truncate text-sm font-medium text-slate-800">
-                                      {level.title}
-                                    </p>
+                                    <div className="flex flex-wrap items-center gap-2">
+                                      <p className="truncate text-sm font-medium text-slate-800">
+                                        {level.title}
+                                      </p>
+                                      <span
+                                        className={[
+                                          'rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide',
+                                          isVersionLevel(level)
+                                            ? 'border-indigo-200 bg-indigo-50 text-indigo-700'
+                                            : 'border-slate-200 bg-white text-slate-500',
+                                        ].join(' ')}
+                                      >
+                                        {isVersionLevel(level)
+                                          ? 'Versione'
+                                          : 'Frase'}
+                                      </span>
+                                      {segmentCount !== null ? (
+                                        <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[10px] font-semibold text-slate-600">
+                                          {segmentCount} segmenti
+                                        </span>
+                                      ) : null}
+                                    </div>
+                                    {isVersionLevel(level) ? (
+                                      <p className="mt-1 text-xs font-medium text-slate-500">
+                                        {level.version.autore}
+                                      </p>
+                                    ) : null}
                                     <p className="truncate font-serif text-xs italic text-slate-500">
-                                      {level.analysis.frase_originale}
+                                      {getLevelPreviewText(level)}
                                     </p>
                                     <p className="mt-2 text-xs font-medium text-amber-800">
                                       Valore max stimato:{' '}
@@ -458,6 +744,7 @@ export function AdminDashboard() {
                                 </div>
 
                                 <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                                  {isSentenceLevel(level) ? (
                                   <div>
                                     <label className="block text-xs font-medium text-slate-600">
                                       Coefficiente
@@ -479,6 +766,7 @@ export function AdminDashboard() {
                                       className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-slate-400"
                                     />
                                   </div>
+                                  ) : null}
                                   <div>
                                     <label className="block text-xs font-medium text-slate-600">
                                       Compenso max fisso (Sesterzi)

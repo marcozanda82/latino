@@ -8,8 +8,10 @@ import {
   type ReactNode,
 } from 'react'
 import type { LatinAnalysis } from '../types'
+import type { VersionExercise } from '../types/version'
 import {
   createLevel,
+  createVersionLevel,
   deleteLevel,
   fetchLevels,
   subscribeToLevels,
@@ -25,6 +27,11 @@ interface ExerciseContextValue {
     title: string,
     analysis: LatinAnalysis,
     groupName: string,
+  ) => Promise<Level>
+  addVersionLevel: (
+    version: VersionExercise,
+    groupName: string,
+    customMaxReward?: number,
   ) => Promise<Level>
   removeLevel: (id: string) => Promise<void>
 }
@@ -71,6 +78,22 @@ export function ExerciseProvider({ children }: { children: ReactNode }) {
     [],
   )
 
+  const addVersionLevel = useCallback(
+    async (
+      version: VersionExercise,
+      groupName: string,
+      customMaxReward?: number,
+    ) => {
+      setSaving(true)
+      try {
+        return await createVersionLevel(version, groupName, customMaxReward)
+      } finally {
+        setSaving(false)
+      }
+    },
+    [],
+  )
+
   const removeLevel = useCallback(async (id: string) => {
     setSaving(true)
     try {
@@ -87,9 +110,18 @@ export function ExerciseProvider({ children }: { children: ReactNode }) {
       saving,
       refreshLevels,
       addLevel,
+      addVersionLevel,
       removeLevel,
     }),
-    [levels, loading, saving, refreshLevels, addLevel, removeLevel],
+    [
+      levels,
+      loading,
+      saving,
+      refreshLevels,
+      addLevel,
+      addVersionLevel,
+      removeLevel,
+    ],
   )
 
   return (

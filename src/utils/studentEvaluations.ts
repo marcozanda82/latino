@@ -1,13 +1,25 @@
 import type { Level } from '../services/exerciseService'
+import { isSentenceLevel, isVersionLevel } from '../services/exerciseService'
 import type { PendingTranslation } from '../types/evaluation'
 
-/** Mappa levelId → valutazione più recente (con fallback su frase latina). */
+/** Mappa levelId → valutazione più recente (con fallback su frase/titolo). */
 export function buildEvaluationByLevelId(
   evaluations: PendingTranslation[],
   levels: Level[],
 ): Record<string, PendingTranslation> {
   const fraseToLevelId = Object.fromEntries(
-    levels.map((level) => [level.analysis.frase_originale, level.id]),
+    levels.flatMap((level) => {
+      if (isSentenceLevel(level)) {
+        return [[level.analysis.frase_originale, level.id] as const]
+      }
+      if (isVersionLevel(level)) {
+        return [
+          [level.version.titolo, level.id] as const,
+          [level.title, level.id] as const,
+        ]
+      }
+      return []
+    }),
   )
   const map: Record<string, PendingTranslation> = {}
 

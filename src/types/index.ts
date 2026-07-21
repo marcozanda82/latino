@@ -53,3 +53,11 @@ export interface DropZoneConfig {
   label: string
   stepId: StepId
 }
+
+export type {
+  ExerciseType,
+  VersionExercise,
+  VersionSegment,
+} from './version'
+
+export { isVersionExercise } from './version'

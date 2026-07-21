@@ -1,10 +1,16 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { LatinTranslator } from './LatinTranslator'
+import { VersionTranslator } from './VersionTranslator'
 import { AppLayout } from './layout/AppLayout'
 import { PlayLevelSkeleton } from './ui/Skeletons'
 import { GlassCard } from './ui/GlassCard'
-import { fetchLevelById, type Level } from '../services/exerciseService'
+import {
+  fetchLevelById,
+  isSentenceLevel,
+  isVersionLevel,
+  type Level,
+} from '../services/exerciseService'
 import { subscribeToStudentEvaluations } from '../services/firebaseEvaluations'
 
 export function PlayLevel() {
@@ -45,11 +51,15 @@ export function PlayLevel() {
     if (!level) return
 
     const unsubscribe = subscribeToStudentEvaluations((evaluations) => {
-      const alreadySubmitted = evaluations.some(
-        (evaluation) =>
-          evaluation.levelId === level.id ||
-          evaluation.fraseOriginale === level.analysis.frase_originale,
-      )
+      const alreadySubmitted = evaluations.some((evaluation) => {
+        if (evaluation.levelId === level.id) return true
+
+        if (isSentenceLevel(level)) {
+          return evaluation.fraseOriginale === level.analysis.frase_originale
+        }
+
+        return evaluation.fraseOriginale === level.version.titolo
+      })
 
       if (alreadySubmitted) {
         navigate('/', { replace: true })
@@ -76,6 +86,18 @@ export function PlayLevel() {
           </Link>
         </GlassCard>
       </AppLayout>
+    )
+  }
+
+  if (isVersionLevel(level)) {
+    return (
+      <VersionTranslator
+        version={level.version}
+        levelId={level.id}
+        levelTitle={level.title}
+        customMaxReward={level.customMaxReward}
+        onBackToLevels={() => navigate('/')}
+      />
     )
   }
 

@@ -71,6 +71,12 @@ function mapDocToPendingTranslation(
   return {
     id,
     levelId: typeof data.levelId === 'string' ? data.levelId : undefined,
+    exerciseType:
+      data.exerciseType === 'version' || data.exerciseType === 'sentence'
+        ? data.exerciseType
+        : undefined,
+    titolo: typeof data.titolo === 'string' ? data.titolo : undefined,
+    autore: typeof data.autore === 'string' ? data.autore : undefined,
     fraseOriginale: data.fraseOriginale,
     traduzioneAttesa: data.traduzioneAttesa,
     traduzioneStudente: data.traduzioneStudente,
@@ -78,6 +84,10 @@ function mapDocToPendingTranslation(
     bonusScore:
       typeof data.bonusScore === 'number' ? data.bonusScore : undefined,
     reward: typeof data.reward === 'number' ? data.reward : undefined,
+    suggestedReward:
+      typeof data.suggestedReward === 'number'
+        ? data.suggestedReward
+        : undefined,
     totalScore:
       typeof data.totalScore === 'number' ? data.totalScore : undefined,
     autoApproved: data.autoApproved === true,
@@ -85,6 +95,32 @@ function mapDocToPendingTranslation(
       typeof data.freeTranslation === 'string' &&
       data.freeTranslation.trim()
         ? data.freeTranslation.trim()
+        : undefined,
+    segmentTranslations: Array.isArray(data.segmentTranslations)
+      ? data.segmentTranslations
+          .map((item) => {
+            if (!item || typeof item !== 'object') return null
+            const segment = item as Record<string, unknown>
+            if (
+              typeof segment.id !== 'number' ||
+              typeof segment.latino !== 'string' ||
+              typeof segment.traduzione !== 'string'
+            ) {
+              return null
+            }
+            return {
+              id: segment.id,
+              latino: segment.latino,
+              traduzione: segment.traduzione,
+            }
+          })
+          .filter(
+            (item): item is NonNullable<typeof item> => item !== null,
+          )
+      : undefined,
+    tutorNotes:
+      typeof data.tutorNotes === 'string' && data.tutorNotes.trim()
+        ? data.tutorNotes.trim()
         : undefined,
     status,
     createdAt: data.createdAt as Timestamp | undefined,
@@ -150,6 +186,135 @@ export async function submitTranslationForReview(
   } catch (error) {
     console.error(
       '[firebaseEvaluations] submitTranslationForReview failed:',
+      error,
+    )
+    throw error
+  }
+}
+
+export interface SubmitVersionForReviewInput {
+  levelId?: string
+  titolo: string
+  autore: string
+  segmentTranslations: Array<{
+    id: number
+    latino: string
+    traduzione: string
+  }>
+  bellaCopia: string
+  /** Premio massimo suggerito al tutor (non accreditato alla consegna) */
+  suggestedReward?: number
+}
+
+export async function submitVersionForReview(
+  data: SubmitVersionForReviewInput,
+): Promise<{ id: string }> {
+  try {
+    const bellaCopia = data.bellaCopia.trim()
+    if (!bellaCopia) {
+      throw new Error('La bella copia non può essere vuota.')
+    }
+
+    const latinoCompleto = data.segmentTranslations
+      .map((segment) => segment.latino.trim())
+      .filter(Boolean)
+      .join('\n\n')
+
+    const bruttaCopia = data.segmentTranslations
+      .map((segment) => segment.traduzione.trim())
+      .filter(Boolean)
+      .join('\n\n')
+
+    const suggestedReward =
+      typeof data.suggestedReward === 'number' &&
+      Number.isFinite(data.suggestedReward) &&
+      data.suggestedReward >= 0
+        ? Math.round(data.suggestedReward)
+        : undefined
+
+    const docRef = await addDoc(collection(db, EVALUATIONS_COLLECTION), {
+      ...(data.levelId ? { levelId: data.levelId } : {}),
+      exerciseType: 'version',
+      fraseOriginale: latinoCompleto || data.titolo,
+      traduzioneAttesa: '',
+      traduzioneStudente: bruttaCopia || bellaCopia,
+      freeTranslation: bellaCopia,
+      segmentTranslations: data.segmentTranslations,
+      titolo: data.titolo,
+      autore: data.autore,
+      mechanicalScore: 0,
+      reward: 0,
+      ...(suggestedReward !== undefined ? { suggestedReward } : {}),
+      status: PENDING_STATUS,
+      autoApproved: false,
+      bonusScore: null,
+      totalScore: null,
+      createdAt: serverTimestamp(),
+    })
+
+    return { id: docRef.id }
+  } catch (error) {
+    console.error(
+      '[firebaseEvaluations] submitVersionForReview failed:',
+      error,
+    )
+    throw error
+  }
+}
+
+export async function approveVersionEvaluation(
+  id: string,
+  options: {
+    reward: number
+    tutorNotes?: string
+  },
+): Promise<void> {
+  if (!id.trim()) {
+    throw new Error('ID valutazione mancante.')
+  }
+
+  const reward = Math.round(options.reward)
+  if (!Number.isFinite(reward) || reward < 0) {
+    throw new Error('Premio in Sesterzi non valido.')
+  }
+
+  const evaluationRef = doc(db, EVALUATIONS_COLLECTION, id)
+  const snapshot = await getDoc(evaluationRef)
+
+  if (!snapshot.exists()) {
+    throw new Error('Valutazione non trovata.')
+  }
+
+  const evaluation = mapDocToPendingTranslation(id, snapshot.data())
+  if (!evaluation) {
+    throw new Error('Valutazione non valida.')
+  }
+
+  if (evaluation.status !== PENDING_STATUS) {
+    throw new Error('Questa versione è già stata valutata.')
+  }
+
+  const tutorNotes = options.tutorNotes?.trim() || ''
+
+  try {
+    await updateDoc(evaluationRef, {
+      status: APPROVED_STATUS,
+      reward,
+      totalScore: reward,
+      bonusScore: reward,
+      tutorNotes: tutorNotes || null,
+    })
+
+    if (reward > 0) {
+      const title = evaluation.titolo || evaluation.fraseOriginale
+      await creditSesterzi(
+        reward,
+        `Ricompensa tutor per versione: ${title}`,
+      )
+    }
+  } catch (error) {
+    console.error(
+      '[firebaseEvaluations] approveVersionEvaluation failed:',
       error,
     )
     throw error

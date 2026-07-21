@@ -118,7 +118,9 @@ export function StudentArchive() {
   const analysisByLevelId = useMemo(
     () =>
       Object.fromEntries(
-        levels.map((level) => [level.id, level.analysis]),
+        levels.flatMap((level) =>
+          level.type === 'sentence' ? [[level.id, level.analysis] as const] : [],
+        ),
       ),
     [levels],
   )
@@ -126,7 +128,11 @@ export function StudentArchive() {
   const analysisByFrase = useMemo(
     () =>
       Object.fromEntries(
-        levels.map((level) => [level.analysis.frase_originale, level.analysis]),
+        levels.flatMap((level) =>
+          level.type === 'sentence'
+            ? [[level.analysis.frase_originale, level.analysis] as const]
+            : [],
+        ),
       ),
     [levels],
   )

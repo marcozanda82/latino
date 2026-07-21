@@ -20,6 +20,11 @@ import {
 } from '../utils/levelGroups'
 import { subscribeToStudentEvaluations } from '../services/firebaseEvaluations'
 import type { PendingTranslation } from '../types/evaluation'
+import {
+  getLevelPreviewText,
+  isSentenceLevel,
+  isVersionLevel,
+} from '../services/exerciseService'
 import { calculateMaxSesterziReward } from '../utils/gamification'
 import {
   filterLevelsWithoutSubmission,
@@ -214,10 +219,15 @@ export function StudentHome() {
 
                     <div className="grid gap-5 sm:grid-cols-2">
                       {group.levels.map((level, index) => {
-                        const maxReward = calculateMaxSesterziReward(
-                          level.analysis,
-                          level.customMaxReward,
-                        )
+                        const maxReward = isSentenceLevel(level)
+                          ? calculateMaxSesterziReward(
+                              level.analysis,
+                              level.customMaxReward,
+                            )
+                          : typeof level.customMaxReward === 'number'
+                            ? Math.round(level.customMaxReward)
+                            : 0
+                        const preview = getLevelPreviewText(level)
 
                         return (
                           <motion.div
@@ -231,14 +241,30 @@ export function StudentHome() {
                               className="block text-left transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lift active:scale-[0.98]"
                             >
                               <GlassCard className="!p-6">
-                                <p className="text-xs font-semibold uppercase tracking-widest text-slate-500">
-                                  Livello {index + 1}
-                                </p>
+                                <div className="flex items-start justify-between gap-3">
+                                  <p className="text-xs font-semibold uppercase tracking-widest text-slate-500">
+                                    Livello {index + 1}
+                                  </p>
+                                  {isVersionLevel(level) ? (
+                                    <span className="rounded-full border border-indigo-200 bg-indigo-50 px-2.5 py-1 text-xs font-medium text-indigo-700">
+                                      Versione
+                                    </span>
+                                  ) : (
+                                    <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-600">
+                                      Frase
+                                    </span>
+                                  )}
+                                </div>
                                 <h3 className="mt-3 text-base font-semibold text-slate-800">
                                   {level.title}
                                 </h3>
+                                {isVersionLevel(level) && (
+                                  <p className="mt-1 text-xs font-medium text-slate-500">
+                                    {level.version.autore}
+                                  </p>
+                                )}
                                 <p className="mt-2 font-serif text-sm italic leading-relaxed text-slate-600">
-                                  « {level.analysis.frase_originale} »
+                                  « {preview} »
                                 </p>
                                 <p className="mt-3 text-xs font-medium text-slate-600">
                                   Valore massimo:{' '}
@@ -247,7 +273,9 @@ export function StudentHome() {
                                   </span>
                                 </p>
                                 <p className="mt-5 text-xs font-medium text-emerald-700">
-                                  Inizia traduzione
+                                  {isVersionLevel(level)
+                                    ? 'Inizia versione'
+                                    : 'Inizia traduzione'}
                                 </p>
                               </GlassCard>
                             </Link>

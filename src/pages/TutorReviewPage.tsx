@@ -11,6 +11,7 @@ export function TutorReviewPage() {
     evaluatingId,
     resettingId,
     handleEvaluate,
+    handleApproveVersion,
     handleReset,
   } = usePendingEvaluations()
 
@@ -55,6 +56,7 @@ export function TutorReviewPage() {
         evaluatingId={evaluatingId}
         resettingId={resettingId}
         onEvaluate={handleEvaluate}
+        onApproveVersion={handleApproveVersion}
         onReset={handleReset}
       />
     </AppLayout>

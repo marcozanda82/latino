@@ -1,4 +1,5 @@
 import type { Timestamp } from 'firebase/firestore'
+import type { ExerciseType } from './version'
 
 export type EvaluationStatus =
   | 'in_attesa'
@@ -7,10 +8,21 @@ export type EvaluationStatus =
   | 'giallo'
   | 'rosso'
 
+export interface VersionSegmentSubmission {
+  id: number
+  latino: string
+  traduzione: string
+}
+
 export interface PendingTranslation {
   id: string
   /** ID del livello Firestore collegato all'esercizio */
   levelId?: string
+  /** Tipologia esercizio: frase a 5 step o versione */
+  exerciseType?: ExerciseType
+  /** Metadati versione (se exerciseType === 'version') */
+  titolo?: string
+  autore?: string
   fraseOriginale: string
   traduzioneAttesa: string
   traduzioneStudente: string
@@ -18,11 +30,17 @@ export interface PendingTranslation {
   mechanicalScore: number
   /** Sesterzi guadagnati dallo studente al completamento */
   reward?: number
+  /** Suggerimento di premio (es. customMaxReward del livello), non ancora accreditato */
+  suggestedReward?: number
   bonusScore?: number
   totalScore?: number
   autoApproved?: boolean
   /** Resa in italiano fluida (bella copia), opzionale */
   freeTranslation?: string
+  /** Traduzioni per segmento (solo moduli versione) */
+  segmentTranslations?: VersionSegmentSubmission[]
+  /** Feedback del tutor (versioni e, in futuro, frasi) */
+  tutorNotes?: string
   createdAt?: Timestamp
 }
 

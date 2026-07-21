@@ -1,5 +1,7 @@
-import { motion } from 'framer-motion'
+import { useState } from 'react'
+import { AnimatePresence, motion } from 'framer-motion'
 import { GlassCard } from './ui/GlassCard'
+import { VersionReviewModal } from './VersionReviewModal'
 import type { EvaluationStatus, PendingTranslation } from '../types/evaluation'
 
 interface TutorDashboardProps {
@@ -12,12 +14,16 @@ interface TutorDashboardProps {
     bonusScore: number,
     mechanicalScore: number,
   ) => void
+  onApproveVersion: (
+    id: string,
+    payload: { reward: number; tutorNotes: string },
+  ) => void | Promise<void>
   onReset: (id: string, reverseReward: boolean) => void
 }
 
 const STATUS_LABELS: Record<EvaluationStatus, string> = {
   in_attesa: 'In attesa',
-  approved: 'Auto-convalidata',
+  approved: 'Approvata',
   verde: 'Corretta',
   giallo: 'Parziale',
   rosso: 'Errata',
@@ -50,7 +56,7 @@ const STATUS_STYLES: Record<
 }
 
 const EVALUATION_ACTIONS: Array<{
-  status: Exclude<EvaluationStatus, 'in_attesa'>
+  status: Exclude<EvaluationStatus, 'in_attesa' | 'approved'>
   label: string
   bonusScore: number
   className: string
@@ -77,13 +83,24 @@ const EVALUATION_ACTIONS: Array<{
   },
 ]
 
+function isVersionEvaluation(item: PendingTranslation): boolean {
+  return (
+    item.exerciseType === 'version' ||
+    Array.isArray(item.segmentTranslations)
+  )
+}
+
 export function TutorDashboard({
   evaluations,
   evaluatingId = null,
   resettingId = null,
   onEvaluate,
+  onApproveVersion,
   onReset,
 }: TutorDashboardProps) {
+  const [reviewingVersion, setReviewingVersion] =
+    useState<PendingTranslation | null>(null)
+
   const isBusy = evaluatingId !== null || resettingId !== null
   const awaitingCount = evaluations.filter(
     (item) => item.status === 'in_attesa',
@@ -140,6 +157,10 @@ export function TutorDashboard({
           {evaluations.map((item, index) => {
             const styles = STATUS_STYLES[item.status]
             const isPending = item.status === 'in_attesa'
+            const isVersion = isVersionEvaluation(item)
+            const displayTitle = isVersion
+              ? item.titolo || item.fraseOriginale
+              : item.fraseOriginale
 
             return (
               <motion.li
@@ -158,140 +179,212 @@ export function TutorDashboard({
                   className={`rounded-xl border p-6 ${styles.border}`}
                 >
                   <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                      <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">
-                        Frase latina
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span
+                          className={[
+                            'rounded-full border px-2.5 py-1 text-xs font-semibold',
+                            isVersion
+                              ? 'border-indigo-200 bg-indigo-50 text-indigo-700'
+                              : 'border-slate-200 bg-slate-50 text-slate-600',
+                          ].join(' ')}
+                        >
+                          {isVersion ? 'Versione' : 'Frase'}
+                        </span>
+                        <span
+                          className={`rounded-full border px-3 py-1 text-xs font-semibold ${styles.badge}`}
+                        >
+                          {STATUS_LABELS[item.status]}
+                        </span>
+                      </div>
+                      <p className="mt-3 text-xs font-semibold uppercase tracking-widest text-slate-400">
+                        {isVersion ? 'Titolo' : 'Frase latina'}
                       </p>
                       <p className="mt-1 text-base font-medium text-slate-800">
-                        {item.fraseOriginale}
+                        {displayTitle}
                       </p>
+                      {isVersion && item.autore ? (
+                        <p className="mt-1 text-sm text-slate-500">
+                          {item.autore}
+                        </p>
+                      ) : null}
                     </div>
-                    <span
-                      className={`rounded-full border px-3 py-1 text-xs font-semibold ${styles.badge}`}
-                    >
-                      {STATUS_LABELS[item.status]}
-                    </span>
                   </div>
 
-                  <div className="mt-5 grid gap-4 md:grid-cols-2">
-                    <div className="rounded-lg border border-slate-100 bg-slate-50 px-4 py-3">
-                      <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">
-                        Punteggio meccanico
-                      </p>
-                      <p className="mt-2 text-sm font-medium text-slate-800">
-                        {item.mechanicalScore}/60
-                      </p>
-                    </div>
-
-                    <div className="rounded-lg border border-slate-100 bg-slate-50 px-4 py-3">
-                      <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">
-                        Bonus traduzione (max)
-                      </p>
-                      <p className="mt-2 text-sm font-medium text-slate-800">
-                        +40 punti
-                      </p>
-                    </div>
-
-                    {typeof item.reward === 'number' && item.reward > 0 ? (
-                      <div className="rounded-lg border border-amber-100 bg-amber-50 px-4 py-3 md:col-span-2">
-                        <p className="text-xs font-semibold uppercase tracking-widest text-amber-700">
-                          Sesterzi guadagnati
+                  {isVersion ? (
+                    <>
+                      <div className="mt-5 rounded-xl border border-sky-200 bg-sky-50/80 px-5 py-4">
+                        <p className="text-xs font-semibold uppercase tracking-widest text-sky-700">
+                          Bella copia (anteprima)
                         </p>
-                        <p className="mt-2 text-sm font-medium tabular-nums text-amber-900">
-                          +{item.reward.toLocaleString('it-IT')} Sesterzi
+                        <p className="mt-3 line-clamp-4 whitespace-pre-wrap font-serif text-base italic leading-relaxed text-slate-800">
+                          {item.freeTranslation || item.traduzioneStudente}
                         </p>
                       </div>
-                    ) : null}
-                  </div>
 
-                  <div className="mt-5 grid gap-4 md:grid-cols-2">
-                    <div className="rounded-lg border border-slate-100 bg-slate-50 px-4 py-3">
-                      <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">
-                        Traduzione attesa
-                      </p>
-                      <p className="mt-2 text-sm font-medium text-slate-800">
-                        {item.traduzioneAttesa}
-                      </p>
-                    </div>
-
-                    <div className="rounded-lg border border-slate-100 bg-white px-4 py-3">
-                      <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">
-                        Traduzione studente
-                      </p>
-                      <p className="mt-2 text-sm font-medium text-slate-800">
-                        {item.traduzioneStudente}
-                      </p>
-                    </div>
-                  </div>
-
-                  {item.freeTranslation ? (
-                    <div className="mt-5 rounded-xl border border-sky-200 bg-sky-50/80 px-5 py-4">
-                      <p className="text-xs font-semibold uppercase tracking-widest text-sky-700">
-                        Traduzione Fluida dello Studente
-                      </p>
-                      <p className="mt-3 font-serif text-lg italic leading-relaxed text-slate-800">
-                        {item.freeTranslation}
-                      </p>
-                    </div>
-                  ) : null}
-
-                  {isPending ? (
-                    <div className="mt-5 flex flex-wrap gap-3">
-                      {EVALUATION_ACTIONS.map((action) => (
-                        <button
-                          key={action.status}
-                          type="button"
-                          aria-disabled={isBusy}
-                          onClick={(e) => {
-                            e.preventDefault()
-                            if (isBusy) return
-                            onEvaluate(
-                              item.id,
-                              action.status,
-                              action.bonusScore,
-                              item.mechanicalScore,
-                            )
-                          }}
-                          className={[
-                            'relative z-10 min-h-11 cursor-pointer touch-manipulation rounded-lg border px-4 py-2.5 text-sm font-medium shadow-sm transition-colors can-hover:hover:opacity-90',
-                            action.className,
-                            isBusy ? 'pointer-events-none opacity-50' : '',
-                          ]
-                            .filter(Boolean)
-                            .join(' ')}
-                        >
-                          {evaluatingId === item.id ? 'Salvataggio...' : action.label}
-                        </button>
-                      ))}
-                    </div>
+                      {isPending ? (
+                        <div className="mt-5">
+                          <button
+                            type="button"
+                            disabled={isBusy}
+                            onClick={() => setReviewingVersion(item)}
+                            className="rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            Correggi / Valuta
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="mt-5 rounded-xl border border-slate-200 bg-slate-50/80 p-5">
+                          <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">
+                            Riepilogo versione
+                          </p>
+                          <dl className="mt-4 space-y-2 text-sm text-slate-700">
+                            <div className="flex justify-between gap-4">
+                              <dt>Premio assegnato</dt>
+                              <dd className="font-medium tabular-nums">
+                                {(item.reward ?? 0).toLocaleString('it-IT')}{' '}
+                                Sesterzi
+                              </dd>
+                            </div>
+                          </dl>
+                          {item.tutorNotes ? (
+                            <div className="mt-4 border-t border-slate-200 pt-4">
+                              <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">
+                                Note del tutor
+                              </p>
+                              <p className="mt-2 whitespace-pre-wrap text-sm text-slate-700">
+                                {item.tutorNotes}
+                              </p>
+                            </div>
+                          ) : null}
+                        </div>
+                      )}
+                    </>
                   ) : (
-                    <div className="mt-5 rounded-xl border border-slate-200 bg-slate-50/80 p-5">
-                      <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">
-                        Riepilogo voto
-                      </p>
-                      <dl className="mt-4 space-y-2 text-sm text-slate-700">
-                        <div className="flex justify-between gap-4">
-                          <dt>Punteggio Meccanico</dt>
-                          <dd className="font-medium tabular-nums">
+                    <>
+                      <div className="mt-5 grid gap-4 md:grid-cols-2">
+                        <div className="rounded-lg border border-slate-100 bg-slate-50 px-4 py-3">
+                          <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">
+                            Punteggio meccanico
+                          </p>
+                          <p className="mt-2 text-sm font-medium text-slate-800">
                             {item.mechanicalScore}/60
-                          </dd>
+                          </p>
                         </div>
-                        <div className="flex justify-between gap-4">
-                          <dt>Bonus Traduzione</dt>
-                          <dd className="font-medium tabular-nums">
-                            +{item.bonusScore ?? 0}/40
-                          </dd>
+
+                        <div className="rounded-lg border border-slate-100 bg-slate-50 px-4 py-3">
+                          <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">
+                            Bonus traduzione (max)
+                          </p>
+                          <p className="mt-2 text-sm font-medium text-slate-800">
+                            +40 punti
+                          </p>
                         </div>
-                      </dl>
-                      <div className="mt-4 flex items-center justify-between gap-4 border-t border-slate-200 pt-4">
-                        <span className="text-sm font-semibold text-slate-800">
-                          Voto Finale
-                        </span>
-                        <span className="rounded-full border border-slate-800 bg-slate-800 px-4 py-1.5 text-lg font-bold tabular-nums text-white shadow-sm">
-                          {item.totalScore ?? item.mechanicalScore} / 100
-                        </span>
+
+                        {typeof item.reward === 'number' && item.reward > 0 ? (
+                          <div className="rounded-lg border border-amber-100 bg-amber-50 px-4 py-3 md:col-span-2">
+                            <p className="text-xs font-semibold uppercase tracking-widest text-amber-700">
+                              Sesterzi guadagnati
+                            </p>
+                            <p className="mt-2 text-sm font-medium tabular-nums text-amber-900">
+                              +{item.reward.toLocaleString('it-IT')} Sesterzi
+                            </p>
+                          </div>
+                        ) : null}
                       </div>
-                    </div>
+
+                      <div className="mt-5 grid gap-4 md:grid-cols-2">
+                        <div className="rounded-lg border border-slate-100 bg-slate-50 px-4 py-3">
+                          <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">
+                            Traduzione attesa
+                          </p>
+                          <p className="mt-2 text-sm font-medium text-slate-800">
+                            {item.traduzioneAttesa}
+                          </p>
+                        </div>
+
+                        <div className="rounded-lg border border-slate-100 bg-white px-4 py-3">
+                          <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">
+                            Traduzione studente
+                          </p>
+                          <p className="mt-2 text-sm font-medium text-slate-800">
+                            {item.traduzioneStudente}
+                          </p>
+                        </div>
+                      </div>
+
+                      {item.freeTranslation ? (
+                        <div className="mt-5 rounded-xl border border-sky-200 bg-sky-50/80 px-5 py-4">
+                          <p className="text-xs font-semibold uppercase tracking-widest text-sky-700">
+                            Traduzione Fluida dello Studente
+                          </p>
+                          <p className="mt-3 font-serif text-lg italic leading-relaxed text-slate-800">
+                            {item.freeTranslation}
+                          </p>
+                        </div>
+                      ) : null}
+
+                      {isPending ? (
+                        <div className="mt-5 flex flex-wrap gap-3">
+                          {EVALUATION_ACTIONS.map((action) => (
+                            <button
+                              key={action.status}
+                              type="button"
+                              aria-disabled={isBusy}
+                              onClick={(e) => {
+                                e.preventDefault()
+                                if (isBusy) return
+                                onEvaluate(
+                                  item.id,
+                                  action.status,
+                                  action.bonusScore,
+                                  item.mechanicalScore,
+                                )
+                              }}
+                              className={[
+                                'relative z-10 min-h-11 cursor-pointer touch-manipulation rounded-lg border px-4 py-2.5 text-sm font-medium shadow-sm transition-colors can-hover:hover:opacity-90',
+                                action.className,
+                                isBusy ? 'pointer-events-none opacity-50' : '',
+                              ]
+                                .filter(Boolean)
+                                .join(' ')}
+                            >
+                              {evaluatingId === item.id
+                                ? 'Salvataggio...'
+                                : action.label}
+                            </button>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="mt-5 rounded-xl border border-slate-200 bg-slate-50/80 p-5">
+                          <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">
+                            Riepilogo voto
+                          </p>
+                          <dl className="mt-4 space-y-2 text-sm text-slate-700">
+                            <div className="flex justify-between gap-4">
+                              <dt>Punteggio Meccanico</dt>
+                              <dd className="font-medium tabular-nums">
+                                {item.mechanicalScore}/60
+                              </dd>
+                            </div>
+                            <div className="flex justify-between gap-4">
+                              <dt>Bonus Traduzione</dt>
+                              <dd className="font-medium tabular-nums">
+                                +{item.bonusScore ?? 0}/40
+                              </dd>
+                            </div>
+                          </dl>
+                          <div className="mt-4 flex items-center justify-between gap-4 border-t border-slate-200 pt-4">
+                            <span className="text-sm font-semibold text-slate-800">
+                              Voto Finale
+                            </span>
+                            <span className="rounded-full border border-slate-800 bg-slate-800 px-4 py-1.5 text-lg font-bold tabular-nums text-white shadow-sm">
+                              {item.totalScore ?? item.mechanicalScore} / 100
+                            </span>
+                          </div>
+                        </div>
+                      )}
+                    </>
                   )}
 
                   <div className="mt-5 border-t border-slate-100 pt-4">
@@ -312,6 +405,28 @@ export function TutorDashboard({
           })}
         </ul>
       )}
+
+      <AnimatePresence>
+        {reviewingVersion ? (
+          <VersionReviewModal
+            key={reviewingVersion.id}
+            evaluation={reviewingVersion}
+            isSubmitting={evaluatingId === reviewingVersion.id}
+            onClose={() => {
+              if (evaluatingId) return
+              setReviewingVersion(null)
+            }}
+            onApprove={async (payload) => {
+              try {
+                await onApproveVersion(reviewingVersion.id, payload)
+                setReviewingVersion(null)
+              } catch {
+                // Toast già gestito dallo smart container
+              }
+            }}
+          />
+        ) : null}
+      </AnimatePresence>
     </section>
   )
 }

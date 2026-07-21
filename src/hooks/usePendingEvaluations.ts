@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { showError, showSuccess } from '../lib/toast'
 import {
+  approveVersionEvaluation,
   resetEvaluation,
   subscribeToAllEvaluations,
   subscribeToPendingEvaluations,
@@ -12,7 +13,7 @@ const STATUS_SUCCESS_LABELS: Record<
   Exclude<EvaluationStatus, 'in_attesa'>,
   string
 > = {
-  approved: 'Traduzione auto-convalidata.',
+  approved: 'Valutazione approvata.',
   verde: 'Traduzione segnata come corretta.',
   giallo: 'Traduzione segnata come parziale.',
   rosso: 'Traduzione segnata come errata.',
@@ -61,6 +62,33 @@ export function usePendingEvaluations() {
     [evaluatingId, resettingId],
   )
 
+  const handleApproveVersion = useCallback(
+    async (id: string, payload: { reward: number; tutorNotes: string }) => {
+      if (evaluatingId || resettingId) {
+        throw new Error('Operazione già in corso.')
+      }
+
+      setEvaluatingId(id)
+
+      try {
+        await approveVersionEvaluation(id, payload)
+        showSuccess(
+          `Versione approvata. Assegnati ${payload.reward.toLocaleString('it-IT')} Sesterzi.`,
+        )
+      } catch (error) {
+        console.error(
+          '[usePendingEvaluations] handleApproveVersion failed:',
+          error,
+        )
+        showError('Impossibile approvare la versione. Riprova.')
+        throw error
+      } finally {
+        setEvaluatingId(null)
+      }
+    },
+    [evaluatingId, resettingId],
+  )
+
   const handleReset = useCallback(
     async (id: string, reverseReward: boolean) => {
       if (evaluatingId || resettingId) return
@@ -91,6 +119,7 @@ export function usePendingEvaluations() {
     evaluatingId,
     resettingId,
     handleEvaluate,
+    handleApproveVersion,
     handleReset,
   }
 }
