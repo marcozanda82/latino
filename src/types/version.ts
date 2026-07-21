@@ -4,6 +4,10 @@ export interface VersionSegment {
   id: number
   latino: string
   note?: string
+  /** Quota di difficoltà sul totale (0–100), generata dall'AI */
+  difficolta_percentuale?: number
+  /** Sesterzi assegnati a questo segmento in base alla difficoltà */
+  compenso_assegnato?: number
 }
 
 /** Payload JSON di una Versione latina (modulo indipendente dall'analisi a 5 step). */
@@ -13,6 +17,10 @@ export interface VersionExercise {
   autore: string
   introduzione: string
   segmenti: VersionSegment[]
+}
+
+function isOptionalNumber(value: unknown): boolean {
+  return value === undefined || (typeof value === 'number' && Number.isFinite(value))
 }
 
 export function isVersionExercise(value: unknown): value is VersionExercise {
@@ -30,7 +38,9 @@ export function isVersionExercise(value: unknown): value is VersionExercise {
       return (
         typeof item.id === 'number' &&
         typeof item.latino === 'string' &&
-        (item.note === undefined || typeof item.note === 'string')
+        (item.note === undefined || typeof item.note === 'string') &&
+        isOptionalNumber(item.difficolta_percentuale) &&
+        isOptionalNumber(item.compenso_assegnato)
       )
     })
   )

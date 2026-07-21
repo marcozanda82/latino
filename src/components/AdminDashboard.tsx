@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
+import { Bot, Check } from 'lucide-react'
 import { JsonLoader } from './JsonLoader'
 import { useExercises } from '../context/ExerciseContext'
 import { AppLayout } from './layout/AppLayout'
@@ -21,6 +22,7 @@ import { usePendingEvaluations } from '../hooks/usePendingEvaluations'
 import { TutorDashboard } from './TutorDashboard'
 import { TutorRewardsManager } from './TutorRewardsManager'
 import { TutorTransactionsManager } from './TutorTransactionsManager'
+import { VERSION_AI_PROMPT } from '../constants/aiPrompt'
 import type { LatinAnalysis } from '../types'
 import type { VersionExercise } from '../types/version'
 import {
@@ -67,6 +69,7 @@ export function AdminDashboard() {
   )
   const [versionJsonText, setVersionJsonText] = useState('')
   const [versionMaxReward, setVersionMaxReward] = useState('')
+  const [promptCopied, setPromptCopied] = useState(false)
   const [title, setTitle] = useState('')
   const [groupName, setGroupName] = useState('Settimana 1')
   const [settings, setSettings] = useState<GamificationSettings>(
@@ -193,6 +196,17 @@ export function AdminDashboard() {
           ? error.message
           : 'Errore: Il file JSON non ha il formato corretto per la versione'
       showError(message)
+    }
+  }
+
+  const handleCopyAiPrompt = async () => {
+    try {
+      await navigator.clipboard.writeText(VERSION_AI_PROMPT)
+      setPromptCopied(true)
+      window.setTimeout(() => setPromptCopied(false), 2000)
+    } catch (error) {
+      console.error('[AdminDashboard] handleCopyAiPrompt failed:', error)
+      showError('Impossibile copiare il prompt negli appunti.')
     }
   }
 
@@ -454,16 +468,37 @@ export function AdminDashboard() {
               </GlassCard>
             ) : (
               <GlassCard>
-                <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">
-                  Import JSON
-                </p>
-                <h2 className="mt-1 text-base font-medium text-slate-700">
-                  Incolla il JSON della versione
-                </h2>
-                <p className="mt-2 text-sm text-slate-500">
-                  Deve includere titolo, autore, introduzione e l&apos;array
-                  segmenti.
-                </p>
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">
+                      Import JSON
+                    </p>
+                    <h2 className="mt-1 text-base font-medium text-slate-700">
+                      Incolla il JSON della versione
+                    </h2>
+                    <p className="mt-2 text-sm text-slate-500">
+                      Deve includere titolo, autore, introduzione e l&apos;array
+                      segmenti. Puoi generarlo con un&apos;AI esterna.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleCopyAiPrompt}
+                    className={[
+                      'inline-flex shrink-0 items-center gap-2 rounded-lg border px-4 py-2.5 text-sm font-medium shadow-sm transition-colors',
+                      promptCopied
+                        ? 'border-emerald-500 bg-emerald-500 text-white'
+                        : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50',
+                    ].join(' ')}
+                  >
+                    {promptCopied ? (
+                      <Check className="h-4 w-4" aria-hidden />
+                    ) : (
+                      <Bot className="h-4 w-4" aria-hidden />
+                    )}
+                    {promptCopied ? 'Copiato!' : 'Copia Prompt per AI'}
+                  </button>
+                </div>
                 <textarea
                   value={versionJsonText}
                   onChange={(event) => setVersionJsonText(event.target.value)}

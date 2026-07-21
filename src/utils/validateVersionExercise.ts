@@ -71,6 +71,12 @@ export function parseVersionExerciseJson(raw: string): VersionExercise {
       id: segment.id,
       latino: segment.latino.trim(),
       note: segment.note?.trim() ? segment.note.trim() : '',
+      ...(typeof segment.difficolta_percentuale === 'number'
+        ? { difficolta_percentuale: segment.difficolta_percentuale }
+        : {}),
+      ...(typeof segment.compenso_assegnato === 'number'
+        ? { compenso_assegnato: segment.compenso_assegnato }
+        : {}),
     })),
   }
 }
