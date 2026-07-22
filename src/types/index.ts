@@ -58,6 +58,11 @@ export type {
   ExerciseType,
   VersionExercise,
   VersionSegment,
+  VersionProgress,
+  VersionSegmentProgress,
+  VersionSegmentProgressStatus,
+  VersionSegmentSubmission,
+  VersionSegmentStepAnswers,
 } from './version'
 
-export { isVersionExercise } from './version'
+export { getVersionSegmentLatinText, isVersionExercise } from './version'

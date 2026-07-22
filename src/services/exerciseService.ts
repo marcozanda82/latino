@@ -11,7 +11,7 @@ import {
 import { db } from '../config/firebase'
 import type { LatinAnalysis } from '../types'
 import type { ExerciseType, VersionExercise } from '../types/version'
-import { isVersionExercise } from '../types/version'
+import { getVersionSegmentLatinText, isVersionExercise } from '../types/version'
 
 export interface BaseLevel {
   id: string
@@ -48,7 +48,9 @@ export function isVersionLevel(level: Level): level is VersionLevel {
 
 export function getLevelPreviewText(level: Level): string {
   if (isVersionLevel(level)) {
-    const firstSegment = level.version.segmenti[0]?.latino?.trim()
+    const firstSegment = level.version.segmenti[0]
+      ? getVersionSegmentLatinText(level.version.segmenti[0]).trim()
+      : undefined
     if (firstSegment) {
       return firstSegment.length > 120
         ? `${firstSegment.slice(0, 120)}…`
@@ -320,3 +322,10 @@ export async function updateLevelCompensation(
 
   await updateDoc(levelRef, updates)
 }
+
+export {
+  createInitialVersionProgress,
+  getVersionProgress,
+  reconcileVersionProgress,
+  saveVersionProgress,
+} from './versionProgressService'

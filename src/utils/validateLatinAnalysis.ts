@@ -23,7 +23,7 @@ function extractJsonContent(raw: string): string {
   return fenced ? fenced[1].trim() : trimmed
 }
 
-function isLatinAnalysis(value: unknown): value is LatinAnalysis {
+export function isLatinAnalysis(value: unknown): value is LatinAnalysis {
   if (!value || typeof value !== 'object') return false
 
   const data = value as Record<string, unknown>
@@ -61,7 +61,9 @@ function isLatinAnalysis(value: unknown): value is LatinAnalysis {
   )
 }
 
-function validateCoherence(analysis: LatinAnalysis): string | null {
+export function validateLatinAnalysisCoherence(
+  analysis: LatinAnalysis,
+): string | null {
   if (!analysis.parole_array.includes(analysis.step1_verbo.parola_corretta)) {
     return 'Il verbo indicato non compare tra le parole della frase.'
   }
@@ -113,7 +115,7 @@ export function parseLatinAnalysisJson(raw: string): LatinAnalysis {
     throw new JsonLoadError(JSON_LOAD_ERROR)
   }
 
-  const coherenceError = validateCoherence(parsed)
+  const coherenceError = validateLatinAnalysisCoherence(parsed)
   if (coherenceError) {
     throw new JsonLoadError(`${JSON_LOAD_ERROR} (${coherenceError})`)
   }

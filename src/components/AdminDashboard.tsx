@@ -604,7 +604,7 @@ export function AdminDashboard() {
                         key={segment.id}
                         className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 font-serif text-sm text-slate-700"
                       >
-                        {segment.latino}
+                        {segment.analisi.frase_originale}
                       </li>
                     ))}
                     {pendingVersion.segmenti.length > 3 ? (

@@ -28,6 +28,7 @@ export {
 
 export interface StudentProfile {
   balance: number
+  aiFeedbackEnabled?: boolean
 }
 
 function normalizeBalance(value: unknown): number {
@@ -51,6 +52,42 @@ export async function ensureStudentProfile(): Promise<StudentProfile> {
   }
 
   return { balance }
+}
+
+export function subscribeToStudentProfile(
+  callback: (profile: StudentProfile) => void,
+): () => void {
+  const studentRef = getStudentDocRef()
+  const docPath = getStudentBalanceDocPath()
+
+  return onSnapshot(
+    studentRef,
+    (snapshot) => {
+      if (!snapshot.exists()) {
+        void ensureStudentProfile().catch((error) => {
+          console.error(
+            '[studentService] ensureStudentProfile failed during subscribe:',
+            { docPath, error },
+          )
+        })
+        callback({ balance: 0 })
+        return
+      }
+
+      const data = snapshot.data()
+      callback({
+        balance: normalizeBalance(data?.balance),
+        aiFeedbackEnabled: data?.aiFeedbackEnabled === true,
+      })
+    },
+    (error) => {
+      console.error('[studentService] subscribeToStudentProfile failed:', {
+        docPath,
+        error,
+      })
+      callback({ balance: 0 })
+    },
+  )
 }
 
 export function subscribeToStudentBalance(

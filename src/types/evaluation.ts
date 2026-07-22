@@ -1,5 +1,5 @@
 import type { Timestamp } from 'firebase/firestore'
-import type { ExerciseType } from './version'
+import type { ExerciseType, VersionSegmentSubmission } from './version'
 
 export type EvaluationStatus =
   | 'in_attesa'
@@ -8,11 +8,7 @@ export type EvaluationStatus =
   | 'giallo'
   | 'rosso'
 
-export interface VersionSegmentSubmission {
-  id: number
-  latino: string
-  traduzione: string
-}
+export type { VersionSegmentSubmission } from './version'
 
 export interface PendingTranslation {
   id: string

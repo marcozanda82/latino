@@ -23,9 +23,13 @@ interface FinalReviewPanelProps {
   isSubmitted: boolean
   earnedSesterzi: number | null
   wasAutoApproved?: boolean
+  hideXp?: boolean
+  hideTutorSubmit?: boolean
+  projectedSesterzi?: number
   onEditStep: (step: AppStep) => void
   onSubmit: (freeTranslation: string) => void
-  onBackToLevels: () => void
+  onConfirmSegment?: () => void
+  onBackToLevels?: () => void
 }
 
 function wordFromTileId(tileId: string): string {
@@ -53,8 +57,12 @@ export function FinalReviewPanel({
   isSubmitted,
   earnedSesterzi,
   wasAutoApproved = false,
+  hideXp = false,
+  hideTutorSubmit = false,
+  projectedSesterzi,
   onEditStep,
   onSubmit,
+  onConfirmSegment,
   onBackToLevels,
 }: FinalReviewPanelProps) {
   const [freeTranslation, setFreeTranslation] = useState('')
@@ -184,7 +192,7 @@ export function FinalReviewPanel({
           </p>
         </div>
 
-        {!isSubmitted ? (
+        {!isSubmitted && !hideTutorSubmit ? (
           <div className="rounded-lg border border-violet-200 bg-violet-50/70 px-4 py-4">
             <label
               htmlFor="free-translation"
@@ -205,7 +213,7 @@ export function FinalReviewPanel({
               className="mt-3 w-full resize-y rounded-lg border border-violet-200 bg-white px-4 py-3 text-sm leading-relaxed text-slate-800 outline-none transition-shadow placeholder:text-slate-400 focus:border-violet-400 focus:ring-2 focus:ring-violet-200"
             />
           </div>
-        ) : freeTranslation.trim() ? (
+        ) : !hideTutorSubmit && freeTranslation.trim() ? (
           <div className="rounded-lg border border-violet-200 bg-violet-50/70 px-4 py-4">
             <p className="text-xs font-semibold uppercase tracking-widest text-violet-800">
               Resa in italiano (Bella copia)
@@ -217,29 +225,55 @@ export function FinalReviewPanel({
         ) : null}
 
         <div className="flex flex-wrap gap-3 border-t border-slate-200 pt-4 text-sm text-slate-600">
-          <span>XP: {score}</span>
+          {!hideXp ? <span>XP: {score}</span> : null}
+          {!hideXp &&
+          typeof projectedSesterzi === 'number' &&
+          projectedSesterzi > 0 ? (
+            <span>
+              Sesterzi stimati: {projectedSesterzi.toLocaleString('it-IT')}
+            </span>
+          ) : null}
           <span>Analisi meccanica: {mechanicalScore}/60</span>
         </div>
       </GlassCard>
 
       {!isSubmitted ? (
         <div className="flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
-          <button
-            type="button"
-            onClick={() => onSubmit(freeTranslation)}
-            disabled={isSubmitting || !studentFullTranslation.trim()}
-            className="min-h-11 cursor-pointer rounded-lg border border-sky-600 bg-sky-600 px-8 py-3 text-sm font-semibold text-white shadow-sm transition-all can-hover:hover:bg-sky-700 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-200 disabled:text-slate-400"
-          >
-            {isSubmitting ? 'Invio in corso…' : 'Invia al Tutor'}
-          </button>
+          {hideTutorSubmit && onConfirmSegment ? (
+            <button
+              type="button"
+              onClick={onConfirmSegment}
+              disabled={isSubmitting || !studentFullTranslation.trim()}
+              className="min-h-11 cursor-pointer rounded-lg border border-sky-600 bg-sky-600 px-8 py-3 text-sm font-semibold text-white shadow-sm transition-all can-hover:hover:bg-sky-700 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-200 disabled:text-slate-400"
+            >
+              {isSubmitting ? 'Conferma in corso…' : 'Conferma segmento'}
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => onSubmit(freeTranslation)}
+              disabled={isSubmitting || !studentFullTranslation.trim()}
+              className="min-h-11 cursor-pointer rounded-lg border border-sky-600 bg-sky-600 px-8 py-3 text-sm font-semibold text-white shadow-sm transition-all can-hover:hover:bg-sky-700 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-200 disabled:text-slate-400"
+            >
+              {isSubmitting ? 'Invio in corso…' : 'Invia al Tutor'}
+            </button>
+          )}
         </div>
       ) : (
         <GlassCard className="border border-emerald-200 bg-emerald-50/80 !p-5 text-center">
           <p className="text-sm font-medium text-emerald-900">
-            {wasAutoApproved
-              ? 'Traduzione perfetta auto-convalidata! Non serve l\'approvazione del Tutor.'
-              : 'Compito inviato! Il Tutor valuterà la tua traduzione.'}{' '}
-            Hai protetto {mechanicalScore} punti su 60.
+            {hideTutorSubmit ? (
+              <>
+                Segmento confermato! Hai protetto {mechanicalScore} punti su 60.
+              </>
+            ) : (
+              <>
+                {wasAutoApproved
+                  ? 'Traduzione perfetta auto-convalidata! Non serve l\'approvazione del Tutor.'
+                  : 'Compito inviato! Il Tutor valuterà la tua traduzione.'}{' '}
+                Hai protetto {mechanicalScore} punti su 60.
+              </>
+            )}
           </p>
           {earnedSesterzi !== null && earnedSesterzi > 0 ? (
             <p className="mt-3 text-sm font-semibold text-amber-800">
@@ -251,13 +285,15 @@ export function FinalReviewPanel({
       )}
 
       <div className="flex justify-center">
-        <button
-          type="button"
-          onClick={onBackToLevels}
-          className="cursor-pointer rounded-lg border border-slate-300 bg-white px-6 py-2.5 text-sm font-medium text-slate-700 shadow-sm transition-colors can-hover:hover:bg-slate-50"
-        >
-          Torna ai Livelli
-        </button>
+        {onBackToLevels ? (
+          <button
+            type="button"
+            onClick={onBackToLevels}
+            className="cursor-pointer rounded-lg border border-slate-300 bg-white px-6 py-2.5 text-sm font-medium text-slate-700 shadow-sm transition-colors can-hover:hover:bg-slate-50"
+          >
+            Torna ai Livelli
+          </button>
+        ) : null}
       </div>
     </motion.div>
   )

@@ -7,35 +7,46 @@ Ti fornirò l'immagine di una versione di latino (o di un gruppo di frasi) tratt
 
 Il compenso totale stabilito dal Tutor per questo esercizio è di: [INSERISCI QUI I SESTERZI] Sesterzi.
 
-Il tuo compito è analizzare l'immagine e generare un output diviso in DUE PARTI: un'analisi della difficoltà e un file JSON formattato.
-
-### FASE 1: Analisi e Ripartizione (Testo normale)
-1. Estrai il testo latino, il titolo, l'autore, l'introduzione (se presente) e le note a piè di pagina.
-2. Segmenta il testo latino in periodi logici e compiuti (di solito delimitati da punti fermi).
-3. Analizza la difficoltà grammaticale e sintattica di ogni segmento (es. presenza di ablativi assoluti, subordinate complesse, verbi deponenti, ecc.).
-4. Elenca i segmenti in ordine decrescente di difficoltà (dal più difficile al più semplice).
-5. Assegna a ciascun segmento una percentuale di difficoltà e ripartisci il compenso totale in base a questa percentuale. Se la difficoltà di alcuni segmenti risulta indistinguibile o non ci sono elementi sintattici di rilievo, stima la difficoltà assegnando un valore medio proporzionato per far quadrare il 100%. Nessun segmento deve avere un valore nullo.
+### FASE 1: Analisi, Segmentazione e Ripartizione (Testo normale)
+1. Estrai il testo latino, il titolo, l'autore, l'introduzione e le note a piè di pagina.
+2. Segmenta il testo latino in periodi logici (basandoti sui segni di interpunzione forti). Non spezzare subordinate all'interno dello stesso periodo.
+3. Assegna a ciascun segmento una percentuale di difficoltà (totale 100%) e ripartisci il compenso totale in base a questa percentuale (nessun segmento a zero).
 
 ### FASE 2: Generazione JSON (Code block)
-Genera il file JSON da inserire nel database dell'applicazione, rispettando rigorosamente la seguente struttura. Assicurati che le note del libro siano associate al segmento corretto.
+Genera il file JSON. Per OGNI segmento, devi generare un oggetto \`analisi\` identico allo schema delle 'Frasi Singole' a 5 step.
 
+Regole rigorose per l'oggetto \`analisi\`:
+- \`frase_originale\`: Il testo latino esatto del segmento.
+- \`parole_array\`: Array contenente ogni singola parola e segno di punteggiatura della \`frase_originale\`, nell'ordine esatto.
+- \`step1_verbo.parola_corretta\`: Deve essere identica a uno degli elementi in \`parole_array\`.
+- \`step2_analisi_verbo.modo\`: Solo [indicativo, imperativo, infinito, participio, congiuntivo].
+- \`step2_analisi_verbo.forma\`: Solo [attiva, passiva].
+- \`step3_soggetto.parole_corrette\`: Le parole del soggetto (se sottinteso, array vuoto e \`sottinteso: true\`).
+- \`step4_nucleo_tradotto\`: Traduzione del verbo + soggetto in italiano (accetta stringa o array di varianti).
+- \`step5_complementi\`: Array di oggetti. I complementi devono coprire ESATTAMENTE tutte e sole le parole di \`parole_array\` che non fanno parte del verbo o del soggetto. \`caso\` deve essere uno tra [genitivo, dativo, accusativo, vocativo, ablativo, locativo, indeclinabile, subordinata].
+- VERIFICA FINALE: La somma delle parole usate in step 1, step 3 e step 5 deve ricostruire l'intero \`parole_array\`.
+
+STRUTTURA JSON RICHIESTA:
 {
-  "titolo": "Titolo della versione",
+  "titolo": "Titolo",
   "tipo": "version",
-  "autore": "Nome Autore",
-  "introduzione": "Testo introduttivo...",
+  "autore": "Autore",
+  "introduzione": "Testo...",
   "segmenti": [
     {
       "id": 1,
-      "latino": "Testo del primo segmento...",
-      "note": "Eventuali aiuti o note del libro per questo segmento.",
-      "difficolta_percentuale": 15,
-      "compenso_assegnato": 30
+      "note": "Eventuali aiuti",
+      "difficolta_percentuale": 30,
+      "compenso_assegnato": 60,
+      "analisi": {
+        "frase_originale": "Miltiades copias eduxit.",
+        "parole_array": ["Miltiades", "copias", "eduxit", "."],
+        "step1_verbo": { "parola_corretta": "eduxit", "spiegazione_errore": "Cerca il verbo principale" },
+        "step2_analisi_verbo": { "modo": "indicativo", "tempo": "perfetto", "persona": "3", "numero": "singolare", "forma": "attiva" },
+        "step3_soggetto": { "parole_corrette": ["Miltiades"], "sottinteso": false },
+        "step4_nucleo_tradotto": ["Milziade condusse fuori", "Milziade fece uscire"],
+        "step5_complementi": [ { "parole": ["copias"], "caso": "accusativo", "traduzione": "le truppe" }, { "parole": ["."], "caso": "indeclinabile", "traduzione": "." } ]
+      }
     }
   ]
-}
-
-Regole rigide per il JSON:
-- Non aggiungere campi non richiesti.
-- La somma dei valori \`compenso_assegnato\` deve essere esattamente uguale al compenso totale indicato all'inizio.
-- La somma delle \`difficolta_percentuale\` deve essere 100.`
+}`

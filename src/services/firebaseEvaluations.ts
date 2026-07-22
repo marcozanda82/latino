@@ -20,6 +20,7 @@ import { db } from '../config/firebase'
 import { creditSesterzi, reverseSesterziCredit } from './studentService'
 import { matchesTranslation } from '../utils/textNormalization'
 import type { TranslationValue } from '../types'
+import type { VersionSegmentSubmission } from '../types/version'
 
 const EVALUATIONS_COLLECTION = 'evaluations'
 const PENDING_STATUS: EvaluationStatus = 'in_attesa'
@@ -101,21 +102,55 @@ function mapDocToPendingTranslation(
           .map((item) => {
             if (!item || typeof item !== 'object') return null
             const segment = item as Record<string, unknown>
+            const traduzioneSegmento =
+              typeof segment.traduzioneSegmento === 'string'
+                ? segment.traduzioneSegmento
+                : typeof segment.traduzione === 'string'
+                  ? segment.traduzione
+                  : null
+
             if (
               typeof segment.id !== 'number' ||
               typeof segment.latino !== 'string' ||
-              typeof segment.traduzione !== 'string'
+              !traduzioneSegmento
             ) {
               return null
             }
-            return {
+
+            const submission: VersionSegmentSubmission = {
               id: segment.id,
               latino: segment.latino,
-              traduzione: segment.traduzione,
+              traduzioneSegmento,
+              mechanicalScore:
+                typeof segment.mechanicalScore === 'number'
+                  ? segment.mechanicalScore
+                  : 0,
             }
+
+            if (typeof segment.compensoAssegnato === 'number') {
+              submission.compensoAssegnato = segment.compensoAssegnato
+            }
+            if (typeof segment.traduzione === 'string') {
+              submission.traduzione = segment.traduzione
+            }
+            if (typeof segment.xpScore === 'number') {
+              submission.xpScore = segment.xpScore
+            }
+            if (typeof segment.traduzioneAttesa === 'string') {
+              submission.traduzioneAttesa = segment.traduzioneAttesa
+            }
+            if (typeof segment.accuracyScore === 'number') {
+              submission.accuracyScore = segment.accuracyScore
+            }
+            if (segment.stepAnswers && typeof segment.stepAnswers === 'object') {
+              submission.stepAnswers =
+                segment.stepAnswers as VersionSegmentSubmission['stepAnswers']
+            }
+
+            return submission
           })
           .filter(
-            (item): item is NonNullable<typeof item> => item !== null,
+            (item): item is VersionSegmentSubmission => item !== null,
           )
       : undefined,
     tutorNotes:
@@ -196,11 +231,7 @@ export interface SubmitVersionForReviewInput {
   levelId?: string
   titolo: string
   autore: string
-  segmentTranslations: Array<{
-    id: number
-    latino: string
-    traduzione: string
-  }>
+  segmentTranslations: VersionSegmentSubmission[]
   bellaCopia: string
   /** Premio massimo suggerito al tutor (non accreditato alla consegna) */
   suggestedReward?: number
@@ -221,7 +252,9 @@ export async function submitVersionForReview(
       .join('\n\n')
 
     const bruttaCopia = data.segmentTranslations
-      .map((segment) => segment.traduzione.trim())
+      .map((segment) =>
+        (segment.traduzioneSegmento ?? segment.traduzione ?? '').trim(),
+      )
       .filter(Boolean)
       .join('\n\n')
 

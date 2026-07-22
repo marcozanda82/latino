@@ -1,5 +1,9 @@
-import type { VersionExercise } from '../types/version'
+import type { VersionExercise, VersionSegment } from '../types/version'
 import { isVersionExercise } from '../types/version'
+import {
+  isLatinAnalysis,
+  validateLatinAnalysisCoherence,
+} from './validateLatinAnalysis'
 
 export const VERSION_JSON_LOAD_ERROR =
   'Errore: Il file JSON non ha il formato corretto per la versione'
@@ -27,6 +31,39 @@ function normalizeVersionPayload(value: unknown): unknown {
   }
 
   return data
+}
+
+function validateSegmentAnalisi(analisi: unknown, segmentId: number) {
+  if (!isLatinAnalysis(analisi)) {
+    throw new VersionJsonLoadError(
+      `${VERSION_JSON_LOAD_ERROR} (segmento ${segmentId}: analisi non valida).`,
+    )
+  }
+
+  const coherenceError = validateLatinAnalysisCoherence(analisi)
+  if (coherenceError) {
+    throw new VersionJsonLoadError(
+      `${VERSION_JSON_LOAD_ERROR} (segmento ${segmentId}: ${coherenceError}).`,
+    )
+  }
+
+  return analisi
+}
+
+function normalizeSegment(segment: VersionSegment): VersionSegment {
+  const analisi = validateSegmentAnalisi(segment.analisi, segment.id)
+
+  return {
+    id: segment.id,
+    analisi,
+    note: segment.note?.trim() ? segment.note.trim() : '',
+    ...(typeof segment.difficolta_percentuale === 'number'
+      ? { difficolta_percentuale: segment.difficolta_percentuale }
+      : {}),
+    ...(typeof segment.compenso_assegnato === 'number'
+      ? { compenso_assegnato: segment.compenso_assegnato }
+      : {}),
+  }
 }
 
 export function parseVersionExerciseJson(raw: string): VersionExercise {
@@ -67,16 +104,6 @@ export function parseVersionExerciseJson(raw: string): VersionExercise {
     titolo: normalized.titolo.trim(),
     autore: normalized.autore.trim(),
     introduzione: normalized.introduzione.trim(),
-    segmenti: normalized.segmenti.map((segment) => ({
-      id: segment.id,
-      latino: segment.latino.trim(),
-      note: segment.note?.trim() ? segment.note.trim() : '',
-      ...(typeof segment.difficolta_percentuale === 'number'
-        ? { difficolta_percentuale: segment.difficolta_percentuale }
-        : {}),
-      ...(typeof segment.compenso_assegnato === 'number'
-        ? { compenso_assegnato: segment.compenso_assegnato }
-        : {}),
-    })),
+    segmenti: normalized.segmenti.map(normalizeSegment),
   }
 }
