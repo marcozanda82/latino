@@ -1,19 +1,24 @@
 /**
  * Prompt da copiare in ChatGPT/Claude insieme all'immagine della versione.
- * Sostituisci [INSERISCI QUI I SESTERZI] con il compenso totale dell'esercizio.
+ * Sostituisci [INSERISCI QUI IL NUMERO TOTALE, es. 200] con il compenso totale dell'esercizio.
  */
 export const VERSION_AI_PROMPT = `Agisci come un esperto docente di latino e un assistente alla digitalizzazione didattica.
-Ti fornirò l'immagine di una versione di latino (o di un gruppo di frasi) tratta da un libro scolastico.
+Ti fornirò l'immagine di una versione di latino tratta da un libro scolastico.
 
-Il compenso totale stabilito dal Tutor per questo esercizio è di: [INSERISCI QUI I SESTERZI] Sesterzi.
+Il compenso totale stabilito dal Tutor per questo esercizio è di: [INSERISCI QUI IL NUMERO TOTALE, es. 200] Sesterzi.
 
-### FASE 1: Analisi, Segmentazione e Ripartizione (Testo normale)
-1. Estrai il testo latino, il titolo, l'autore, l'introduzione e le note a piè di pagina.
-2. Segmenta il testo latino in periodi logici (basandoti sui segni di interpunzione forti). Non spezzare subordinate all'interno dello stesso periodo.
-3. Assegna a ciascun segmento una percentuale di difficoltà (totale 100%) e ripartisci il compenso totale in base a questa percentuale (nessun segmento a zero).
+REGOLE TASSATIVE PER L'OUTPUT:
+1. Non scrivere ALCUN testo discorsivo prima o dopo il blocco di codice JSON.
+2. Restituisci UNICAMENTE un blocco di codice markdown con il JSON (inizia con \`\`\`json e termina con \`\`\`).
+3. Non usare formule o stringhe descrittive per il compenso: calcola matematicamente il valore in Sesterzi per ogni segmento in base alla percentuale di difficoltà e inserisci SOLO un numero intero (es. 16, 28, ecc.).
 
-### FASE 2: Generazione JSON (Code block)
-Genera il file JSON. Per OGNI segmento, devi generare un oggetto \`analisi\` identico allo schema delle 'Frasi Singole' a 5 step.
+### FASE 1: Segmentazione e Ripartizione
+- Segmenta il testo in periodi logici.
+- Assegna a ciascuno una \`difficolta_percentuale\` (la cui somma totale deve essere esattamente 100).
+- Calcola il \`compenso_assegnato\` per ogni segmento moltiplicando la percentuale per il compenso totale dei Sesterzi fornito sopra (la somma totale deve coincidere esattamente con il compenso totale).
+
+### FASE 2: Generazione JSON Completo
+Per OGNI segmento, genera l'oggetto \`analisi\` a 5 step rispettando rigorosamente lo schema sottostante.
 
 Regole rigorose per l'oggetto \`analisi\`:
 - \`frase_originale\`: Il testo latino esatto del segmento.
@@ -25,8 +30,9 @@ Regole rigorose per l'oggetto \`analisi\`:
 - \`step4_nucleo_tradotto\`: Traduzione del verbo + soggetto in italiano (accetta stringa o array di varianti).
 - \`step5_complementi\`: Array di oggetti. I complementi devono coprire ESATTAMENTE tutte e sole le parole di \`parole_array\` che non fanno parte del verbo o del soggetto. \`caso\` deve essere uno tra [genitivo, dativo, accusativo, vocativo, ablativo, locativo, indeclinabile, subordinata].
 - VERIFICA FINALE: La somma delle parole usate in step 1, step 3 e step 5 deve ricostruire l'intero \`parole_array\`.
+- Non includere il campo \`coefficiente\` nei segmenti versione.
 
-STRUTTURA JSON RICHIESTA:
+STRUTTURA JSON DA RISPETTARE PERFETTAMENTE:
 {
   "titolo": "Titolo",
   "tipo": "version",
