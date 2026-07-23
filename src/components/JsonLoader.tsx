@@ -2,12 +2,15 @@ import { useCallback, useRef, useState, type ChangeEvent, type DragEvent } from 
 import { motion } from 'framer-motion'
 import {
   JsonLoadError,
-  parseLatinAnalysisJson,
+  parseLatinAnalysisBatchJson,
 } from '../utils/validateLatinAnalysis'
 import type { LatinAnalysis } from '../types'
 
 interface JsonLoaderProps {
-  onLoadComplete: (analysis: LatinAnalysis) => void
+  onLoadComplete: (
+    analysis: LatinAnalysis,
+    remaining?: LatinAnalysis[],
+  ) => void
   onError: (message: string) => void
 }
 
@@ -20,9 +23,9 @@ export function JsonLoader({ onLoadComplete, onError }: JsonLoaderProps) {
   const processContent = useCallback(
     (content: string, sourceName?: string) => {
       try {
-        const analysis = parseLatinAnalysisJson(content)
+        const analyses = parseLatinAnalysisBatchJson(content)
         if (sourceName) setFileName(sourceName)
-        onLoadComplete(analysis)
+        onLoadComplete(analyses[0], analyses.slice(1))
       } catch (error) {
         const message =
           error instanceof JsonLoadError
@@ -153,7 +156,7 @@ export function JsonLoader({ onLoadComplete, onError }: JsonLoaderProps) {
         <textarea
           value={jsonText}
           onChange={(event) => setJsonText(event.target.value)}
-          placeholder={'{\n  "frase_originale": "Caesar exercitum in proelium ducit",\n  "parole_array": ["Caesar", "exercitum", "in", "proelium", "ducit"],\n  ...\n}'}
+          placeholder={'[\n  {\n    "frase_originale": "Caesar exercitum in proelium ducit.",\n    "parole_array": ["Caesar", "exercitum", "in", "proelium", "ducit", "."],\n    ...\n  }\n]'}
           rows={10}
           className="mt-4 w-full resize-y rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 font-mono text-sm text-slate-800 shadow-sm outline-none transition-colors placeholder:text-slate-400 focus:border-slate-400 focus:bg-white"
         />

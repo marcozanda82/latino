@@ -3,7 +3,7 @@ import {
   validateComplementStructure,
   validateComplementsCoherence,
 } from './complements'
-import { isValidForm, isValidModo } from './verbAnalysis'
+import { isValidForm, isValidModo, verbMatchesParoleArray } from './verbAnalysis'
 
 function isTranslationValue(value: unknown): value is TranslationValue {
   if (typeof value === 'string') return true
@@ -64,7 +64,7 @@ export function isLatinAnalysis(value: unknown): value is LatinAnalysis {
 export function validateLatinAnalysisCoherence(
   analysis: LatinAnalysis,
 ): string | null {
-  if (!analysis.parole_array.includes(analysis.step1_verbo.parola_corretta)) {
+  if (!verbMatchesParoleArray(analysis.step1_verbo.parola_corretta, analysis.parole_array)) {
     return 'Il verbo indicato non compare tra le parole della frase.'
   }
 
@@ -98,7 +98,23 @@ export class JsonLoadError extends Error {
   }
 }
 
-export function parseLatinAnalysisJson(raw: string): LatinAnalysis {
+function validateParsedLatinAnalysis(parsed: unknown, index?: number): LatinAnalysis {
+  const label =
+    index !== undefined ? `Frase ${index + 1}: ` : ''
+
+  if (!isLatinAnalysis(parsed)) {
+    throw new JsonLoadError(`${label}${JSON_LOAD_ERROR}`)
+  }
+
+  const coherenceError = validateLatinAnalysisCoherence(parsed)
+  if (coherenceError) {
+    throw new JsonLoadError(`${label}${JSON_LOAD_ERROR} (${coherenceError})`)
+  }
+
+  return parsed
+}
+
+export function parseLatinAnalysisBatchJson(raw: string): LatinAnalysis[] {
   if (!raw.trim()) {
     throw new JsonLoadError('Incolla o carica un file JSON prima di procedere.')
   }
@@ -111,14 +127,15 @@ export function parseLatinAnalysisJson(raw: string): LatinAnalysis {
     throw new JsonLoadError('Errore: sintassi JSON non valida.')
   }
 
-  if (!isLatinAnalysis(parsed)) {
-    throw new JsonLoadError(JSON_LOAD_ERROR)
+  const items = Array.isArray(parsed) ? parsed : [parsed]
+  if (items.length === 0) {
+    throw new JsonLoadError('Il JSON non contiene frasi da importare.')
   }
 
-  const coherenceError = validateLatinAnalysisCoherence(parsed)
-  if (coherenceError) {
-    throw new JsonLoadError(`${JSON_LOAD_ERROR} (${coherenceError})`)
-  }
+  return items.map((item, index) => validateParsedLatinAnalysis(item, index))
+}
 
-  return parsed
+export function parseLatinAnalysisJson(raw: string): LatinAnalysis {
+  const analyses = parseLatinAnalysisBatchJson(raw)
+  return analyses[0]
 }

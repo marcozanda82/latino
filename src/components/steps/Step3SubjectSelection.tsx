@@ -5,6 +5,8 @@ import { Shelf } from '../Shelf'
 import { SUBJECT_ERROR_MESSAGES } from '../../constants/dropZones'
 import type { LatinAnalysis, TileData } from '../../types'
 import { areWordSetsEqual, buildTilesFromWords } from '../../utils/tiles'
+import { getInteractiveParoleArray } from '../../utils/complements'
+import { getVerbParoleFromCorretta } from '../../utils/verbAnalysis'
 
 interface Step3SubjectSelectionProps {
   analysis: LatinAnalysis
@@ -21,8 +23,12 @@ interface Step3SubjectSelectionProps {
 }
 
 function buildRemainingWords(analysis: LatinAnalysis): string[] {
-  const verb = analysis.step1_verbo.parola_corretta
-  return analysis.parole_array.filter((word) => word !== verb)
+  const verbParts = getVerbParoleFromCorretta(
+    analysis.step1_verbo.parola_corretta,
+  )
+  return getInteractiveParoleArray(
+    analysis.parole_array.filter((word) => !verbParts.includes(word)),
+  )
 }
 
 export function Step3SubjectSelection({

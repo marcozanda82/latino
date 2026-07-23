@@ -5,6 +5,8 @@ import type { LatinAnalysis } from '../types'
 import type { VerbCategory } from '../utils/verbAnalysis'
 import { VERB_CATEGORY_LABELS } from '../utils/verbAnalysis'
 import { buildTilesFromWords } from '../utils/tiles'
+import { getInteractiveParoleArray } from '../utils/complements'
+import { getVerbParoleFromCorretta } from '../utils/verbAnalysis'
 
 type AppStep = 1 | 2 | 3 | 4 | 5
 
@@ -38,8 +40,12 @@ function wordFromTileId(tileId: string): string {
 }
 
 function buildRemainingWords(analysis: LatinAnalysis): string[] {
-  const verb = analysis.step1_verbo.parola_corretta
-  return analysis.parole_array.filter((word) => word !== verb)
+  const verbParts = getVerbParoleFromCorretta(
+    analysis.step1_verbo.parola_corretta,
+  )
+  return getInteractiveParoleArray(
+    analysis.parole_array.filter((word) => !verbParts.includes(word)),
+  )
 }
 
 export function FinalReviewPanel({

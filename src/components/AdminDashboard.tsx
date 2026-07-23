@@ -22,11 +22,12 @@ import { usePendingEvaluations } from '../hooks/usePendingEvaluations'
 import { TutorDashboard } from './TutorDashboard'
 import { TutorRewardsManager } from './TutorRewardsManager'
 import { TutorTransactionsManager } from './TutorTransactionsManager'
-import { VERSION_AI_PROMPT } from '../constants/aiPrompt'
+import { VERSION_AI_PROMPT, SENTENCE_AI_PROMPT } from '../constants/aiPrompt'
 import type { LatinAnalysis } from '../types'
 import type { VersionExercise } from '../types/version'
 import {
   parseVersionExerciseJson,
+  normalizeVersionExerciseCompensi,
   VersionJsonLoadError,
 } from '../utils/validateVersionExercise'
 
@@ -63,6 +64,9 @@ export function AdminDashboard() {
   const [createType, setCreateType] = useState<CreateContentType>('sentence')
   const [pendingAnalysis, setPendingAnalysis] = useState<LatinAnalysis | null>(
     null,
+  )
+  const [pendingBatchQueue, setPendingBatchQueue] = useState<LatinAnalysis[]>(
+    [],
   )
   const [pendingVersion, setPendingVersion] = useState<VersionExercise | null>(
     null,
@@ -164,19 +168,31 @@ export function AdminDashboard() {
     }
   }
 
-  const handleLoad = (analysis: LatinAnalysis) => {
+  const buildLevelTitle = (analysis: LatinAnalysis) =>
+    analysis.frase_originale.length > 48
+      ? `${analysis.frase_originale.slice(0, 48)}…`
+      : analysis.frase_originale
+
+  const handleLoad = (
+    analysis: LatinAnalysis,
+    remaining: LatinAnalysis[] = [],
+  ) => {
     setPendingVersion(null)
     setPendingAnalysis(analysis)
-    setTitle(
-      analysis.frase_originale.length > 48
-        ? `${analysis.frase_originale.slice(0, 48)}…`
-        : analysis.frase_originale,
-    )
+    setPendingBatchQueue(remaining)
+    setTitle(buildLevelTitle(analysis))
+
+    if (remaining.length > 0) {
+      showSuccess(
+        `Caricate ${remaining.length + 1} frasi. Salva questa per passare alla successiva.`,
+      )
+    }
   }
 
   const handleCreateTypeChange = (next: CreateContentType) => {
     setCreateType(next)
     setPendingAnalysis(null)
+    setPendingBatchQueue([])
     setPendingVersion(null)
     setTitle('')
     setVersionJsonText('')
@@ -185,7 +201,21 @@ export function AdminDashboard() {
 
   const handleLoadVersion = () => {
     try {
-      const version = parseVersionExerciseJson(versionJsonText)
+      const customMaxReward = versionMaxReward.trim()
+        ? Number(versionMaxReward)
+        : undefined
+
+      if (
+        customMaxReward !== undefined &&
+        (!Number.isFinite(customMaxReward) || customMaxReward < 0)
+      ) {
+        showError('Compenso massimo non valido.')
+        return
+      }
+
+      const version = parseVersionExerciseJson(versionJsonText, {
+        customMaxReward,
+      })
       setPendingAnalysis(null)
       setPendingVersion(version)
       setTitle(version.titolo)
@@ -200,8 +230,11 @@ export function AdminDashboard() {
   }
 
   const handleCopyAiPrompt = async () => {
+    const prompt =
+      createType === 'sentence' ? SENTENCE_AI_PROMPT : VERSION_AI_PROMPT
+
     try {
-      await navigator.clipboard.writeText(VERSION_AI_PROMPT)
+      await navigator.clipboard.writeText(prompt)
       setPromptCopied(true)
       window.setTimeout(() => setPromptCopied(false), 2000)
     } catch (error) {
@@ -215,6 +248,20 @@ export function AdminDashboard() {
 
     try {
       await addLevel(title, pendingAnalysis, groupName)
+
+      if (pendingBatchQueue.length > 0) {
+        const [next, ...rest] = pendingBatchQueue
+        setPendingBatchQueue(rest)
+        setPendingAnalysis(next)
+        setTitle(buildLevelTitle(next))
+        showSuccess(
+          rest.length > 0
+            ? `Esercizio salvato. Prossima frase (${rest.length} rimanenti).`
+            : 'Esercizio salvato. Ultima frase in coda.',
+        )
+        return
+      }
+
       setPendingAnalysis(null)
       setTitle('')
       showSuccess('Esercizio salvato con successo!')
@@ -239,10 +286,13 @@ export function AdminDashboard() {
     }
 
     try {
-      const versionToSave: VersionExercise = {
-        ...pendingVersion,
-        titolo: title.trim() || pendingVersion.titolo,
-      }
+      const versionToSave = normalizeVersionExerciseCompensi(
+        {
+          ...pendingVersion,
+          titolo: title.trim() || pendingVersion.titolo,
+        },
+        customMaxReward,
+      )
       await addVersionLevel(versionToSave, groupName, customMaxReward)
       setPendingVersion(null)
       setVersionJsonText('')
@@ -464,7 +514,40 @@ export function AdminDashboard() {
 
             {createType === 'sentence' ? (
               <GlassCard>
-                <JsonLoader onLoadComplete={handleLoad} onError={showError} />
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">
+                      Import JSON
+                    </p>
+                    <h2 className="mt-1 text-base font-medium text-slate-700">
+                      Carica le frasi singole
+                    </h2>
+                    <p className="mt-2 text-sm text-slate-500">
+                      Incolla un oggetto singolo o un array di analisi generate
+                      con un&apos;AI esterna.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleCopyAiPrompt}
+                    className={[
+                      'inline-flex shrink-0 items-center gap-2 rounded-lg border px-4 py-2.5 text-sm font-medium shadow-sm transition-colors',
+                      promptCopied
+                        ? 'border-emerald-500 bg-emerald-500 text-white'
+                        : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50',
+                    ].join(' ')}
+                  >
+                    {promptCopied ? (
+                      <Check className="h-4 w-4" aria-hidden />
+                    ) : (
+                      <Bot className="h-4 w-4" aria-hidden />
+                    )}
+                    {promptCopied ? 'Copiato!' : 'Copia Prompt per AI'}
+                  </button>
+                </div>
+                <div className="mt-6">
+                  <JsonLoader onLoadComplete={handleLoad} onError={showError} />
+                </div>
               </GlassCard>
             ) : (
               <GlassCard>
@@ -526,6 +609,12 @@ export function AdminDashboard() {
                   <h2 className="text-lg font-semibold text-slate-800">
                     Salva come livello
                   </h2>
+                  {pendingBatchQueue.length > 0 && (
+                    <p className="mt-2 text-sm font-medium text-indigo-600">
+                      Frase in coda: {pendingBatchQueue.length + 1} totali (
+                      {pendingBatchQueue.length} rimanenti dopo il salvataggio)
+                    </p>
+                  )}
                   <p className="mt-2 font-serif text-sm italic leading-relaxed text-slate-600">
                     « {pendingAnalysis.frase_originale} »
                   </p>

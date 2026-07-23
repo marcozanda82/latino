@@ -3,6 +3,10 @@ import { motion } from 'framer-motion'
 import { DropZone } from '../DropZone'
 import { Shelf } from '../Shelf'
 import type { LatinAnalysis, TileData } from '../../types'
+import {
+  isCorrectVerbWord,
+} from '../../utils/verbAnalysis'
+import { isPunctuation } from '../../utils/stringUtils'
 
 interface Step1VerbSelectionProps {
   analysis: LatinAnalysis
@@ -54,7 +58,15 @@ export function Step1VerbSelection({
     initialPlacedTileId,
   )
   const [errorTileId, setErrorTileId] = useState<string | null>(null)
-  const [isComplete, setIsComplete] = useState(Boolean(initialPlacedTileId))
+  const [isComplete, setIsComplete] = useState(() => {
+    if (!initialPlacedTileId) return false
+    const initialTile = analysis.parole_array
+      .map((word, index) => ({ id: `tile-${index}-${word}`, word }))
+      .find((tile) => tile.id === initialPlacedTileId)
+    return initialTile
+      ? isCorrectVerbWord(initialTile.word, analysis.step1_verbo.parola_corretta)
+      : false
+  })
 
   const placedTile = placedTileId ? tileById[placedTileId] : null
 
@@ -70,9 +82,12 @@ export function Step1VerbSelection({
 
   const handlePoolTileClick = useCallback(
     (tile: TileData) => {
-      if (isComplete) return
+      if (isComplete || isPunctuation(tile.word)) return
 
-      const isCorrect = tile.word === analysis.step1_verbo.parola_corretta
+      const isCorrect = isCorrectVerbWord(
+        tile.word,
+        analysis.step1_verbo.parola_corretta,
+      )
 
       if (isCorrect) {
         setPlacedTileId(tile.id)

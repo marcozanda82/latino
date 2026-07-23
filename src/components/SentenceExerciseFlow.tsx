@@ -59,6 +59,14 @@ const STEP_LABELS: Record<AppStep, string> = {
   5: 'Analisi Complementi',
 }
 
+export interface PreviousVersionSegmentContext {
+  id: number
+  /** Posizione del segmento nella versione (1-based). */
+  segmentNumber: number
+  latino: string
+  traduzione: string
+}
+
 export interface SentenceExerciseFlowProps {
   analysis: LatinAnalysis
   mode: SentenceExerciseMode
@@ -68,6 +76,8 @@ export interface SentenceExerciseFlowProps {
   customMaxReward?: number
   /** Compenso massimo del segmento (version-segment). */
   segmentMaxReward?: number
+  /** Segmenti già completati (solo version-segment). */
+  previousSegments?: PreviousVersionSegmentContext[]
   onBackToLevels?: () => void
   onCancel?: () => void
   onComplete?: (result: SentenceExerciseCompleteResult) => void
@@ -82,6 +92,7 @@ export function SentenceExerciseFlow({
   levelId,
   customMaxReward,
   segmentMaxReward,
+  previousSegments = [],
   onBackToLevels,
   onCancel,
   onComplete,
@@ -495,6 +506,36 @@ export function SentenceExerciseFlow({
       }
     >
       <GlassCard>
+          {mode === 'version-segment' && previousSegments.length > 0 ? (
+            <details className="mb-6 rounded-xl border border-violet-200 bg-violet-50/60 open:shadow-sm">
+              <summary className="cursor-pointer list-none px-4 py-3 text-sm font-semibold text-violet-900 marker:content-none [&::-webkit-details-marker]:hidden">
+                📖 Contesto e traduzioni precedenti (Segmenti completati)
+              </summary>
+              <div className="space-y-3 border-t border-violet-200/80 px-4 py-4">
+                {previousSegments.map((segment) => (
+                  <div
+                    key={segment.id}
+                    className="rounded-lg border border-violet-100 bg-white/80 px-4 py-3"
+                  >
+                    <p className="text-xs font-semibold uppercase tracking-widest text-violet-700/80">
+                      Segmento {segment.segmentNumber}
+                    </p>
+                    <p className="mt-2 font-serif text-sm font-semibold leading-relaxed text-slate-800">
+                      {segment.latino}
+                    </p>
+                    <p className="mt-2 text-sm leading-relaxed text-slate-700">
+                      {segment.traduzione.trim() || (
+                        <span className="italic text-slate-400">
+                          (traduzione non disponibile)
+                        </span>
+                      )}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </details>
+          ) : null}
+
           {inReview && reviewEditStep !== null ? (
             <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-sky-200 bg-sky-50 px-4 py-3">
               <p className="text-sm font-medium text-sky-900">

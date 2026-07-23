@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { SelfAssessmentTranslation } from '../SelfAssessmentTranslation'
 import type { Complemento } from '../../types'
+import { getInteractiveComplementi } from '../../utils/complements'
 import {
   CASE_CHIP_LABELS,
   CASE_CHIP_VARIANTS,
@@ -93,7 +94,17 @@ export function Step5Satellites({
   initialSelectedCase = null,
   onStateSnapshot,
 }: Step5SatellitesProps) {
-  const [currentIndex, setCurrentIndex] = useState(initialCurrentIndex)
+  const interactiveComplementi = useMemo(
+    () => getInteractiveComplementi(complementi),
+    [complementi],
+  )
+
+  const [currentIndex, setCurrentIndex] = useState(() =>
+    Math.min(
+      initialCurrentIndex,
+      Math.max(0, getInteractiveComplementi(complementi).length - 1),
+    ),
+  )
   const [caseLocked, setCaseLocked] = useState(initialCaseLocked)
   const [selectedCase, setSelectedCase] = useState<LatinCase | null>(
     initialSelectedCase,
@@ -105,18 +116,18 @@ export function Step5Satellites({
   }, [currentIndex, caseLocked, selectedCase, onStateSnapshot])
 
   useEffect(() => {
-    if (complementi.length === 0) {
+    if (interactiveComplementi.length === 0) {
       onComplete()
     }
-  }, [complementi.length, onComplete])
+  }, [interactiveComplementi.length, onComplete])
 
-  if (complementi.length === 0) {
+  if (interactiveComplementi.length === 0) {
     return null
   }
 
-  const current = complementi[currentIndex]
+  const current = interactiveComplementi[currentIndex]
   const blockLabel = current.parole.join(' ')
-  const total = complementi.length
+  const total = interactiveComplementi.length
 
   const handleCaseSelect = (caseValue: LatinCase) => {
     if (caseLocked) return
@@ -135,7 +146,7 @@ export function Step5Satellites({
   }
 
   const handleTranslationConfirmed = () => {
-    if (currentIndex + 1 >= complementi.length) {
+    if (currentIndex + 1 >= interactiveComplementi.length) {
       onComplete()
       return
     }
@@ -158,7 +169,7 @@ export function Step5Satellites({
           Complemento {currentIndex + 1} di {total}
         </p>
         <div className="flex gap-1.5">
-          {complementi.map((_, index) => (
+          {interactiveComplementi.map((_, index) => (
             <div
               key={index}
               className={[

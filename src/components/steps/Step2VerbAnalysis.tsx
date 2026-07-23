@@ -2,11 +2,13 @@ import { useCallback, useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import type { Step2AnalisiVerbo } from '../../types'
 import {
+  formatVerbDisplay,
   getRequiredVerbCategories,
+  getVerbCategoryOptions,
   isInfinitoMode,
   isVerbAnswerCorrect,
+  sanitizeStep2State,
   VERB_CATEGORY_LABELS,
-  VERB_CATEGORY_OPTIONS,
   VERB_CATEGORY_ORDER,
   type VerbCategory,
 } from '../../utils/verbAnalysis'
@@ -106,12 +108,22 @@ export function Step2VerbAnalysis({
   initialSelectedAnswers,
   onStateSnapshot,
 }: Step2VerbAnalysisProps) {
-  const [completed, setCompleted] = useState(
-    () => initialCompleted ?? createInitialCompletedState(),
-  )
+  const [completed, setCompleted] = useState(() => {
+    const base = initialCompleted ?? createInitialCompletedState()
+    if (!initialSelectedAnswers) return base
+    return sanitizeStep2State(analisiVerbo, base, initialSelectedAnswers)
+      .completed
+  })
   const [selectedAnswers, setSelectedAnswers] = useState<
     Partial<Record<VerbCategory, string>>
-  >(() => initialSelectedAnswers ?? {})
+  >(() => {
+    if (!initialSelectedAnswers) return {}
+    return sanitizeStep2State(
+      analisiVerbo,
+      initialCompleted ?? createInitialCompletedState(),
+      initialSelectedAnswers,
+    ).selectedAnswers
+  })
   const [shakingChip, setShakingChip] = useState<string | null>(null)
   const [errorChip, setErrorChip] = useState<string | null>(null)
 
@@ -120,22 +132,22 @@ export function Step2VerbAnalysis({
   }, [completed, selectedAnswers, onStateSnapshot])
 
   const isInfinitoSelected =
-    completed.modo &&
-    selectedAnswers.modo !== undefined &&
-    isInfinitoMode(selectedAnswers.modo)
+    selectedAnswers.modo !== undefined && isInfinitoMode(selectedAnswers.modo)
+
+  const effectiveModo = selectedAnswers.modo ?? analisiVerbo.modo
 
   const requiredCategories = getRequiredVerbCategories(completed, selectedAnswers)
   const allComplete = requiredCategories.every((category) => completed[category])
 
   const handleSelect = useCallback(
     (category: VerbCategory, label: string) => {
-      if (completed[category]) return
+      if (selectedAnswers[category]) return
       if (category === 'persona' && isInfinitoSelected) return
 
       const expected = analisiVerbo[category]
       const chipKey = `${category}-${label}`
 
-      if (isVerbAnswerCorrect(category, label, expected)) {
+      if (isVerbAnswerCorrect(category, label, expected, effectiveModo)) {
         let nextCompleted = { ...completed, [category]: true }
 
         if (category === 'modo' && isInfinitoMode(label)) {
@@ -175,6 +187,7 @@ export function Step2VerbAnalysis({
       onError,
       onMistake,
       selectedAnswers,
+      effectiveModo,
     ],
   )
 
@@ -190,7 +203,7 @@ export function Step2VerbAnalysis({
           Verbo individuato
         </p>
         <span className="mt-3 rounded-xl border border-slate-200 bg-white px-8 py-3 font-serif text-3xl tracking-wide text-slate-800 shadow-sm">
-          {verb}
+          {formatVerbDisplay(verb)}
         </span>
         <p className="mt-3 text-sm text-slate-500">
           Completa l&apos;analisi grammaticale selezionando le opzioni corrette.
@@ -200,8 +213,14 @@ export function Step2VerbAnalysis({
       <div className="flex flex-col gap-6">
         {VERB_CATEGORY_ORDER.map((category) => {
           const isSkippedForInfinito = category === 'persona' && isInfinitoSelected
-          const isLocked = completed[category] || isSkippedForInfinito
+          const hasSelection = Boolean(selectedAnswers[category])
+          const isLocked = hasSelection || isSkippedForInfinito
           const selected = selectedAnswers[category]
+          const options = getVerbCategoryOptions(
+            category,
+            analisiVerbo,
+            selectedAnswers,
+          )
 
           return (
             <section
@@ -225,7 +244,7 @@ export function Step2VerbAnalysis({
               </div>
 
               <div className="relative z-20 pointer-events-auto flex flex-wrap gap-2.5">
-                {VERB_CATEGORY_OPTIONS[category].map((option) => {
+                {options.map((option) => {
                   const chipKey = `${category}-${option}`
                   const isSelected = selected === option
 

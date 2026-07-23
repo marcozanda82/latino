@@ -1,6 +1,8 @@
 import type { Complemento, LatinAnalysis, TranslationValue } from '../types'
 import { isValidCase } from './caseAnalysis'
 import { getPrimaryTranslation } from './textNormalization'
+import { isPunctuation, withoutPunctuation } from './stringUtils'
+import { getVerbParoleFromCorretta } from './verbAnalysis'
 
 function isTranslationValue(value: unknown): value is TranslationValue {
   if (typeof value === 'string') return true
@@ -22,6 +24,44 @@ export function buildFullTranslation(analysis: LatinAnalysis): string {
   return parts.join(' ').replace(/\s+/g, ' ').trim()
 }
 
+/** Complemento formato solo da segni di punteggiatura (es. `{ parole: ["."] }`). */
+export function isPunctuationOnlyComplement(complemento: Complemento): boolean {
+  return (
+    complemento.parole.length > 0 &&
+    complemento.parole.every((word) => isPunctuation(word))
+  )
+}
+
+/** Complementi che lo studente deve classificare nello Step 5. */
+export function getInteractiveComplementi(
+  complementi: Complemento[],
+): Complemento[] {
+  return complementi.filter(
+    (complemento) => !isPunctuationOnlyComplement(complemento),
+  )
+}
+
+/** Parole della frase rilevanti per la selezione interattiva (es. Step 3). */
+export function getInteractiveParoleArray(paroleArray: string[]): string[] {
+  return withoutPunctuation(paroleArray)
+}
+
+/** Parole rimanenti dopo verbo e soggetto, escluse la punteggiatura. */
+export function getRemainingInteractiveWords(analysis: LatinAnalysis): string[] {
+  const verbParts = getVerbParoleFromCorretta(
+    analysis.step1_verbo.parola_corretta,
+  )
+  const subjectParts = analysis.step3_soggetto.sottinteso
+    ? []
+    : analysis.step3_soggetto.parole_corrette
+
+  return withoutPunctuation(
+    analysis.parole_array.filter(
+      (word) => !verbParts.includes(word) && !subjectParts.includes(word),
+    ),
+  )
+}
+
 function sortedWords(words: string[]): string[] {
   return [...words].sort()
 }
@@ -34,7 +74,7 @@ function arraysEqual(a: string[], b: string[]): boolean {
 }
 
 function getNucleusWords(analysis: LatinAnalysis): string[] {
-  const words = [analysis.step1_verbo.parola_corretta]
+  const words = getVerbParoleFromCorretta(analysis.step1_verbo.parola_corretta)
   if (!analysis.step3_soggetto.sottinteso) {
     words.push(...analysis.step3_soggetto.parole_corrette)
   }

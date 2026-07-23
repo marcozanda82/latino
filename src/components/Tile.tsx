@@ -1,6 +1,7 @@
 import { motion } from 'framer-motion'
 import type { TileStatus } from '../types'
 import { WORD_TILE_SURFACE_CLASS } from '../constants/tiles'
+import { isPunctuation } from '../utils/stringUtils'
 
 interface TileProps {
   id: string
@@ -19,7 +20,21 @@ export function Tile({
 }: TileProps) {
   const isError = status === 'error'
   const isPlaced = status === 'placed'
-  const isInteractive = Boolean(onClick) && !disabled
+  const punctuation = isPunctuation(word)
+  const isInteractive = Boolean(onClick) && !disabled && !punctuation
+
+  if (punctuation) {
+    return (
+      <motion.span
+        layout
+        data-tile-id={id}
+        aria-hidden
+        className="inline-flex select-none items-center px-0.5 font-serif text-lg tracking-wide text-slate-400 pointer-events-none"
+      >
+        {word}
+      </motion.span>
+    )
+  }
 
   return (
     <motion.button

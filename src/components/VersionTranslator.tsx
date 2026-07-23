@@ -343,6 +343,22 @@ export function VersionTranslator({
       (segment) => segment.id === activeSegment.id,
     )
 
+    const previousSegments = version.segmenti
+      .filter(
+        (segment) =>
+          segment.id < activeSegment.id &&
+          progress.segments[segment.id]?.status === 'completed',
+      )
+      .sort((a, b) => a.id - b.id)
+      .map((segment) => ({
+        id: segment.id,
+        segmentNumber:
+          version.segmenti.findIndex((item) => item.id === segment.id) + 1,
+        latino: getVersionSegmentLatinText(segment),
+        traduzione:
+          progress.segments[segment.id]?.traduzioneSegmento?.trim() ?? '',
+      }))
+
     return (
       <SentenceExerciseFlow
         key={activeSegment.id}
@@ -350,6 +366,7 @@ export function VersionTranslator({
         analysis={activeSegment.analisi}
         title={`${title} · Segmento ${segmentIndex + 1}`}
         segmentMaxReward={activeSegment.compenso_assegnato}
+        previousSegments={previousSegments}
         hideTutorSubmit
         initialDraft={progress.segments[activeSegment.id]?.draft}
         onCancel={handleCancelSegment}
