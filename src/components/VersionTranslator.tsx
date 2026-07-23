@@ -339,34 +339,34 @@ export function VersionTranslator({
   }
 
   if (activeSegment && !isSubmitted) {
-    const segmentIndex = version.segmenti.findIndex(
+    const activeIndex = version.segmenti.findIndex(
       (segment) => segment.id === activeSegment.id,
     )
 
-    const previousSegments = version.segmenti
-      .filter(
-        (segment) =>
-          segment.id < activeSegment.id &&
-          progress.segments[segment.id]?.status === 'completed',
-      )
-      .sort((a, b) => a.id - b.id)
-      .map((segment) => ({
-        id: segment.id,
-        segmentNumber:
-          version.segmenti.findIndex((item) => item.id === segment.id) + 1,
-        latino: getVersionSegmentLatinText(segment),
-        traduzione:
-          progress.segments[segment.id]?.traduzioneSegmento?.trim() ?? '',
-      }))
+    const previousContext = version.segmenti
+      .slice(0, activeIndex)
+      .flatMap((segment, index) => {
+        const segmentProgress = progress.segments[segment.id]
+        if (segmentProgress?.status !== 'completed') return []
+
+        return [
+          {
+            id: segment.id,
+            segmentNumber: index + 1,
+            latino: getVersionSegmentLatinText(segment),
+            traduzione: segmentProgress.traduzioneSegmento?.trim() ?? '',
+          },
+        ]
+      })
 
     return (
       <SentenceExerciseFlow
         key={activeSegment.id}
         mode="version-segment"
         analysis={activeSegment.analisi}
-        title={`${title} · Segmento ${segmentIndex + 1}`}
+        title={`${title} · Segmento ${activeIndex + 1}`}
         segmentMaxReward={activeSegment.compenso_assegnato}
-        previousSegments={previousSegments}
+        previousContext={previousContext}
         hideTutorSubmit
         initialDraft={progress.segments[activeSegment.id]?.draft}
         onCancel={handleCancelSegment}
