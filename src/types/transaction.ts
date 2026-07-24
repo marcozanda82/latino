@@ -1,6 +1,6 @@
 import type { Timestamp } from 'firebase/firestore'
 
-export type TransactionType = 'earn' | 'spend'
+export type TransactionType = 'earn' | 'spend' | 'manual_bonus'
 
 export type TransactionStatus = 'active' | 'reverted'
 

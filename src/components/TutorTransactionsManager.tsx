@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react'
 import { GlassCard } from './ui/GlassCard'
 import { LevelCardsSkeleton } from './ui/Skeletons'
+import { ManualBonusModal } from './ManualBonusModal'
 import { showError, showSuccess } from '../lib/toast'
 import { revertTransaction } from '../services/transactionService'
 import { useStudentBalance } from '../hooks/useStudentBalance'
@@ -18,6 +19,11 @@ export function TutorTransactionsManager() {
   const { balance } = useStudentBalance()
   const { transactions, loading, error } = useStudentTransactions()
   const [revertingId, setRevertingId] = useState<string | null>(null)
+  const [bonusModalOpen, setBonusModalOpen] = useState(false)
+
+  const handleBonusSuccess = useCallback(() => {
+    showSuccess('Sesterzi assegnati con successo!')
+  }, [])
 
   const handleRevert = useCallback(
     async (transactionId: string, amount: number, description: string) => {
@@ -57,13 +63,31 @@ export function TutorTransactionsManager() {
       </div>
 
       <GlassCard className="border-amber-200/80 bg-gradient-to-br from-amber-50/90 to-white/90 !p-6">
-        <p className="text-xs font-semibold uppercase tracking-widest text-amber-700">
-          Saldo attuale studente
-        </p>
-        <p className="mt-2 font-serif text-3xl font-bold tabular-nums text-amber-900">
-          {balance.toLocaleString('it-IT')} Sesterzi
-        </p>
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-widest text-amber-700">
+              Saldo attuale studente
+            </p>
+            <p className="mt-2 font-serif text-3xl font-bold tabular-nums text-amber-900">
+              {balance.toLocaleString('it-IT')} Sesterzi
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setBonusModalOpen(true)}
+            className="inline-flex shrink-0 items-center gap-2 rounded-lg border border-violet-300 bg-violet-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors can-hover:hover:bg-violet-700"
+          >
+            🎁 Assegna Bonus Sesterzi
+          </button>
+        </div>
       </GlassCard>
+
+      <ManualBonusModal
+        isOpen={bonusModalOpen}
+        onClose={() => setBonusModalOpen(false)}
+        onSuccess={handleBonusSuccess}
+      />
 
       {error ? (
         <GlassCard className="border-rose-200 bg-rose-50/80 py-8 text-center">
@@ -111,7 +135,14 @@ export function TutorTransactionsManager() {
                           reverted ? 'line-through opacity-60' : '',
                         ].join(' ')}
                       >
-                        {tx.description}
+                        <div className="flex flex-wrap items-center gap-2">
+                          {tx.type === 'manual_bonus' ? (
+                            <span className="rounded-full border border-violet-200 bg-violet-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-violet-700">
+                              Bonus tutor
+                            </span>
+                          ) : null}
+                          <span>{tx.description}</span>
+                        </div>
                       </td>
                       <td
                         className={[

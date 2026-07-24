@@ -27,9 +27,18 @@ function mapDocToTransaction(
   data: Record<string, unknown>,
 ): StudentTransaction | null {
   const amount = typeof data.amount === 'number' ? data.amount : Number(data.amount)
+  const type =
+    data.type === 'earn' ||
+    data.type === 'spend' ||
+    data.type === 'manual_bonus'
+      ? data.type
+      : null
   const description =
-    typeof data.description === 'string' ? data.description.trim() : ''
-  const type = data.type === 'earn' || data.type === 'spend' ? data.type : null
+    typeof data.description === 'string'
+      ? data.description.trim()
+      : typeof data.reason === 'string'
+        ? data.reason.trim()
+        : ''
 
   if (!Number.isFinite(amount) || amount === 0 || !description || !type) {
     console.warn('[transactionService] Documento transazione ignorato:', {

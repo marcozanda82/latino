@@ -177,6 +177,44 @@ async function commitEarnTransaction(
   await batch.commit()
 }
 
+/** Bonus o rettifica manuale assegnata dal tutor. */
+export async function assignManualBonus(
+  amount: number,
+  reason: string,
+): Promise<void> {
+  if (!Number.isFinite(amount) || amount === 0) {
+    throw new Error('Inserisci un importo diverso da zero.')
+  }
+
+  const trimmedReason = reason.trim()
+  if (!trimmedReason) {
+    throw new Error('Inserisci una motivazione.')
+  }
+
+  const userId = getStudentUserId()
+  await ensureStudentProfile()
+
+  const studentRef = getStudentDocRef()
+  const txRef = createStudentTransactionDocRef()
+  const batch = writeBatch(db)
+
+  batch.update(studentRef, {
+    balance: increment(amount),
+  })
+  batch.set(txRef, {
+    amount,
+    type: 'manual_bonus',
+    reason: trimmedReason,
+    description: trimmedReason,
+    studentId: userId,
+    status: 'active',
+    timestamp: serverTimestamp(),
+    createdAt: serverTimestamp(),
+  })
+
+  await batch.commit()
+}
+
 export async function creditSesterzi(
   amount: number,
   description: string,
