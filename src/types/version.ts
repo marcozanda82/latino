@@ -10,6 +10,11 @@ export type VersionSegmentProgressStatus =
   | 'in_progress'
   | 'completed'
 
+/** Stato globale dell'esercizio versione lato studente. */
+export type VersionExerciseProgressStatus =
+  | 'in_progress'
+  | 'pending_evaluation'
+
 /** Risposte dello studente ai singoli step (persistenza e review tutor). */
 export interface VersionSegmentStepAnswers {
   step1PlacedTileId: string | null
@@ -84,7 +89,10 @@ export interface VersionProgress {
   activeSegmentId: number | null
   segments: Record<number, VersionSegmentProgress>
   bellaCopia?: string
+  /** Stato dell'intero esercizio (documento padre versionProgress). */
+  status?: VersionExerciseProgressStatus
   submittedAt?: string
+  completedAt?: string
   updatedAt?: string
 }
 

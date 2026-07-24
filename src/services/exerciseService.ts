@@ -324,8 +324,11 @@ export async function updateLevelCompensation(
 }
 
 export {
+  areAllVersionSegmentsCompleted,
   createInitialVersionProgress,
+  finalizeVersionProgress,
   getVersionProgress,
+  isVersionExerciseSubmitted,
   reconcileVersionProgress,
   saveVersionProgress,
 } from './versionProgressService'

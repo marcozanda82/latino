@@ -12,10 +12,16 @@ import { submitVersionForReview } from '../services/firebaseEvaluations'
 import { useVersionProgress } from '../hooks/useVersionProgress'
 import { buildFullTranslation } from '../utils/complements'
 import {
+  areAllVersionSegmentsCompleted,
+  finalizeVersionProgress,
+  isVersionExerciseSubmitted,
+} from '../services/versionProgressService'
+import {
   calculateSegmentReward,
 } from '../utils/scoring'
 import type {
   VersionExercise,
+  VersionProgress,
   VersionSegment,
   VersionSegmentProgressStatus,
   VersionSegmentSubmission,
@@ -68,6 +74,25 @@ function buildDefaultBellaCopia(
     .trim()
 }
 
+function buildSegmentSubmissionsFromProgress(
+  version: VersionExercise,
+  progressSnapshot: VersionProgress,
+): VersionSegmentSubmission[] {
+  return version.segmenti.map((segment) => {
+    const segmentProgress = progressSnapshot.segments[segment.id]
+    return {
+      id: segment.id,
+      latino: getVersionSegmentLatinText(segment),
+      traduzioneSegmento: segmentProgress?.traduzioneSegmento?.trim() ?? '',
+      mechanicalScore: segmentProgress?.mechanicalScore ?? 0,
+      compensoAssegnato: segment.compenso_assegnato,
+      xpScore: segmentProgress?.xpScore,
+      traduzioneAttesa: buildFullTranslation(segment.analisi),
+      stepAnswers: segmentProgress?.stepAnswers,
+    }
+  })
+}
+
 export function VersionTranslator({
   version,
   levelId,
@@ -80,24 +105,21 @@ export function VersionTranslator({
     [version.segmenti],
   )
 
-  const { progress, loading, error, persistProgress } = useVersionProgress(
-    levelId,
-    segmentIds,
-  )
+  const { progress, loading, error, userId, persistProgress, setProgress } =
+    useVersionProgress(levelId, segmentIds)
 
   const [bellaCopiaDraft, setBellaCopiaDraft] = useState('')
   const [bellaCopiaInitialized, setBellaCopiaInitialized] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [showCompletionModal, setShowCompletionModal] = useState(false)
 
   const title = levelTitle?.trim() || version.titolo
-  const isSubmitted = Boolean(progress?.submittedAt)
+  const isSubmitted = progress ? isVersionExerciseSubmitted(progress) : false
 
   const allSegmentsCompleted = useMemo(() => {
     if (!progress) return false
-    return version.segmenti.every(
-      (segment) => progress.segments[segment.id]?.status === 'completed',
-    )
-  }, [progress, version.segmenti])
+    return areAllVersionSegmentsCompleted(segmentIds, progress.segments)
+  }, [progress, segmentIds])
 
   const activeSegmentId = progress?.activeSegmentId ?? null
   const activeSegment =
@@ -159,9 +181,64 @@ export function VersionTranslator({
     }
   }, [progress, persistProgress])
 
+  const submitVersionExercise = useCallback(
+    async (progressSnapshot: VersionProgress, bellaCopia: string) => {
+      if (!levelId || !userId.trim()) {
+        throw new Error('Progressi versione non disponibili.')
+      }
+
+      const trimmedBellaCopia = bellaCopia.trim()
+      if (!trimmedBellaCopia) {
+        throw new Error('La bella copia non può essere vuota.')
+      }
+
+      await submitVersionForReview({
+        levelId,
+        titolo: title,
+        autore: version.autore,
+        segmentTranslations: buildSegmentSubmissionsFromProgress(
+          version,
+          progressSnapshot,
+        ),
+        bellaCopia: trimmedBellaCopia,
+        suggestedReward:
+          typeof customMaxReward === 'number' &&
+          Number.isFinite(customMaxReward)
+            ? Math.round(customMaxReward)
+            : undefined,
+      })
+
+      const finalizedProgress = await finalizeVersionProgress(
+        userId,
+        levelId,
+        {
+          ...progressSnapshot,
+          bellaCopia: trimmedBellaCopia,
+          activeSegmentId: null,
+        },
+      )
+
+      setProgress(finalizedProgress)
+      return finalizedProgress
+    },
+    [customMaxReward, levelId, setProgress, title, userId, version],
+  )
+
+  const handleVersionCompletionSuccess = useCallback(() => {
+    setShowCompletionModal(true)
+    showSuccess(
+      'Versione completata! Inviata al tutor per la correzione e l\'assegnazione dei Sesterzi.',
+    )
+  }, [])
+
+  const handleDismissCompletionModal = useCallback(() => {
+    setShowCompletionModal(false)
+    onBackToLevels()
+  }, [onBackToLevels])
+
   const handleSegmentComplete = useCallback(
     async (segmentId: number, result: SentenceExerciseCompleteResult) => {
-      if (!progress) return
+      if (!progress || isSubmitted || isSubmitting) return
 
       const sortedIds = [...segmentIds].sort((a, b) => a - b)
       const currentIndex = sortedIds.indexOf(segmentId)
@@ -192,7 +269,7 @@ export function VersionTranslator({
         segments[nextId] = { ...segments[nextId], status: 'available' }
       }
 
-      const updatedProgress = {
+      const updatedProgress: VersionProgress = {
         ...progress,
         activeSegmentId: null,
         segments,
@@ -201,26 +278,62 @@ export function VersionTranslator({
 
       try {
         await persistProgress(updatedProgress)
+      } catch {
+        showError('Impossibile salvare il segmento completato. Riprova.')
+        return
+      }
 
-        const willAllBeComplete = version.segmenti.every(
-          (segment) => updatedProgress.segments[segment.id]?.status === 'completed',
-        )
+      const allComplete = areAllVersionSegmentsCompleted(
+        segmentIds,
+        updatedProgress.segments,
+      )
 
-        if (willAllBeComplete) {
+      if (allComplete && !isVersionExerciseSubmitted(updatedProgress)) {
+        try {
+          setIsSubmitting(true)
           const defaultBellaCopia = buildDefaultBellaCopia(
             version.segmenti,
             updatedProgress.segments,
           )
-          setBellaCopiaDraft(
-            updatedProgress.bellaCopia?.trim() || defaultBellaCopia,
-          )
+          await submitVersionExercise(updatedProgress, defaultBellaCopia)
+          setBellaCopiaDraft(defaultBellaCopia)
           setBellaCopiaInitialized(true)
+          handleVersionCompletionSuccess()
+        } catch (completionError) {
+          console.error(
+            '[VersionTranslator] auto version submit failed:',
+            completionError,
+          )
+          showError(
+            'Segmento salvato, ma la consegna al tutor non è riuscita. Usa la panoramica per riprovare.',
+          )
+        } finally {
+          setIsSubmitting(false)
         }
-      } catch {
-        showError('Impossibile salvare il segmento completato. Riprova.')
+        return
+      }
+
+      if (allComplete) {
+        const defaultBellaCopia = buildDefaultBellaCopia(
+          version.segmenti,
+          updatedProgress.segments,
+        )
+        setBellaCopiaDraft(
+          updatedProgress.bellaCopia?.trim() || defaultBellaCopia,
+        )
+        setBellaCopiaInitialized(true)
       }
     },
-    [progress, segmentIds, persistProgress, version.segmenti],
+    [
+      handleVersionCompletionSuccess,
+      isSubmitted,
+      isSubmitting,
+      persistProgress,
+      progress,
+      segmentIds,
+      submitVersionExercise,
+      version.segmenti,
+    ],
   )
 
   const handleBellaCopiaChange = (value: string) => {
@@ -241,26 +354,8 @@ export function VersionTranslator({
     }
   }, [progress, isSubmitted, persistProgress, bellaCopiaDraft])
 
-  const buildSegmentSubmissions = useCallback((): VersionSegmentSubmission[] => {
-    if (!progress) return []
-
-    return version.segmenti.map((segment) => {
-      const segmentProgress = progress.segments[segment.id]
-      return {
-        id: segment.id,
-        latino: getVersionSegmentLatinText(segment),
-        traduzioneSegmento: segmentProgress?.traduzioneSegmento?.trim() ?? '',
-        mechanicalScore: segmentProgress?.mechanicalScore ?? 0,
-        compensoAssegnato: segment.compenso_assegnato,
-        xpScore: segmentProgress?.xpScore,
-        traduzioneAttesa: buildFullTranslation(segment.analisi),
-        stepAnswers: segmentProgress?.stepAnswers,
-      }
-    })
-  }, [progress, version.segmenti])
-
   const handleSubmitVersion = async () => {
-    if (!progress || !allSegmentsCompleted || isSubmitted) return
+    if (!progress || !allSegmentsCompleted || isSubmitted || isSubmitting) return
 
     const bellaCopia = bellaCopiaDraft.trim()
     if (!bellaCopia) {
@@ -271,27 +366,8 @@ export function VersionTranslator({
     setIsSubmitting(true)
 
     try {
-      await submitVersionForReview({
-        levelId,
-        titolo: title,
-        autore: version.autore,
-        segmentTranslations: buildSegmentSubmissions(),
-        bellaCopia,
-        suggestedReward:
-          typeof customMaxReward === 'number' &&
-          Number.isFinite(customMaxReward)
-            ? Math.round(customMaxReward)
-            : undefined,
-      })
-
-      await persistProgress({
-        ...progress,
-        bellaCopia,
-        submittedAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      })
-
-      showSuccess('Versione consegnata. In attesa della valutazione del tutor.')
+      await submitVersionExercise(progress, bellaCopia)
+      handleVersionCompletionSuccess()
     } catch (submitError) {
       console.error('[VersionTranslator] handleSubmitVersion failed:', submitError)
       showError('Impossibile consegnare la versione. Riprova.')
@@ -299,6 +375,10 @@ export function VersionTranslator({
       setIsSubmitting(false)
     }
   }
+
+  const completionModal = showCompletionModal ? (
+    <VersionCompletionModal onDismiss={handleDismissCompletionModal} />
+  ) : null
 
   if (loading) {
     return (
@@ -360,18 +440,23 @@ export function VersionTranslator({
       })
 
     return (
-      <SentenceExerciseFlow
-        key={activeSegment.id}
-        mode="version-segment"
-        analysis={activeSegment.analisi}
-        title={`${title} · Segmento ${activeIndex + 1}`}
-        segmentMaxReward={activeSegment.compenso_assegnato}
-        previousContext={previousContext}
-        hideTutorSubmit
-        initialDraft={progress.segments[activeSegment.id]?.draft}
-        onCancel={handleCancelSegment}
-        onComplete={(result) => void handleSegmentComplete(activeSegment.id, result)}
-      />
+      <>
+        {completionModal}
+        <SentenceExerciseFlow
+          key={activeSegment.id}
+          mode="version-segment"
+          analysis={activeSegment.analisi}
+          title={`${title} · Segmento ${activeIndex + 1}`}
+          segmentMaxReward={activeSegment.compenso_assegnato}
+          previousContext={previousContext}
+          hideTutorSubmit
+          initialDraft={progress.segments[activeSegment.id]?.draft}
+          onCancel={handleCancelSegment}
+          onComplete={(result) =>
+            void handleSegmentComplete(activeSegment.id, result)
+          }
+        />
+      </>
     )
   }
 
@@ -380,7 +465,9 @@ export function VersionTranslator({
   ).length
 
   return (
-    <AppLayout
+    <>
+      {completionModal}
+      <AppLayout
       header={
         <div>
           <p className="text-xs font-semibold uppercase tracking-widest text-slate-500">
@@ -603,5 +690,43 @@ export function VersionTranslator({
         )}
       </div>
     </AppLayout>
+    </>
+  )
+}
+
+function VersionCompletionModal({ onDismiss }: { onDismiss: () => void }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/45 p-4">
+      <motion.div
+        initial={{ opacity: 0, scale: 0.96, y: 12 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        transition={{ type: 'spring', stiffness: 280, damping: 26 }}
+        className="w-full max-w-md rounded-2xl border border-emerald-200 bg-white p-6 shadow-xl"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="version-completion-title"
+      >
+        <p className="text-xs font-semibold uppercase tracking-widest text-emerald-600">
+          Versione completata
+        </p>
+        <h2
+          id="version-completion-title"
+          className="mt-2 text-xl font-semibold text-slate-900"
+        >
+          Inviata al tutor
+        </h2>
+        <p className="mt-3 text-sm leading-relaxed text-slate-600">
+          Versione completata! Inviata al tutor per la correzione e
+          l&apos;assegnazione dei Sesterzi.
+        </p>
+        <button
+          type="button"
+          onClick={onDismiss}
+          className="mt-6 w-full rounded-lg bg-slate-800 px-6 py-3 text-sm font-semibold text-white shadow-sm transition-colors can-hover:hover:bg-slate-700"
+        >
+          Torna alla dashboard
+        </button>
+      </motion.div>
+    </div>
   )
 }

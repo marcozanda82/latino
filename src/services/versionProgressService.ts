@@ -2,6 +2,7 @@ import { doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore'
 import { db } from '../config/firebase'
 import type { ExerciseDraftData } from '../types/exerciseDraft'
 import type {
+  VersionExerciseProgressStatus,
   VersionProgress,
   VersionSegmentProgress,
   VersionSegmentProgressStatus,
@@ -27,6 +28,33 @@ const VALID_STATUSES: VersionSegmentProgressStatus[] = [
   'in_progress',
   'completed',
 ]
+
+const VALID_EXERCISE_STATUSES: VersionExerciseProgressStatus[] = [
+  'in_progress',
+  'pending_evaluation',
+]
+
+function isValidExerciseStatus(
+  value: unknown,
+): value is VersionExerciseProgressStatus {
+  return (
+    typeof value === 'string' &&
+    VALID_EXERCISE_STATUSES.includes(value as VersionExerciseProgressStatus)
+  )
+}
+
+function normalizeTimestampField(value: unknown): string | undefined {
+  if (typeof value === 'string') return value
+  if (
+    value &&
+    typeof value === 'object' &&
+    'toDate' in value &&
+    typeof (value as { toDate: () => Date }).toDate === 'function'
+  ) {
+    return (value as { toDate: () => Date }).toDate().toISOString()
+  }
+  return undefined
+}
 
 function isValidStatus(value: unknown): value is VersionSegmentProgressStatus {
   return (
@@ -131,8 +159,10 @@ function normalizeVersionProgress(
     segments,
     bellaCopia:
       typeof raw.bellaCopia === 'string' ? raw.bellaCopia : undefined,
+    status: isValidExerciseStatus(raw.status) ? raw.status : undefined,
     submittedAt:
       typeof raw.submittedAt === 'string' ? raw.submittedAt : undefined,
+    completedAt: normalizeTimestampField(raw.completedAt),
     updatedAt: typeof raw.updatedAt === 'string' ? raw.updatedAt : undefined,
   }
 }
@@ -156,6 +186,7 @@ export function createInitialVersionProgress(
     userId,
     activeSegmentId: null,
     segments,
+    status: 'in_progress',
     updatedAt: new Date().toISOString(),
   }
 }
@@ -206,9 +237,61 @@ export function reconcileVersionProgress(
     activeSegmentId,
     segments,
     bellaCopia: stored.bellaCopia,
+    status: stored.status ?? 'in_progress',
     submittedAt: stored.submittedAt,
+    completedAt: stored.completedAt,
     updatedAt: stored.updatedAt ?? new Date().toISOString(),
   }
+}
+
+export function areAllVersionSegmentsCompleted(
+  segmentIds: number[],
+  segments: Record<number, VersionSegmentProgress>,
+): boolean {
+  return (
+    segmentIds.length > 0 &&
+    segmentIds.every((id) => segments[id]?.status === 'completed')
+  )
+}
+
+export function isVersionExerciseSubmitted(progress: VersionProgress): boolean {
+  return (
+    progress.status === 'pending_evaluation' || Boolean(progress.submittedAt)
+  )
+}
+
+export async function finalizeVersionProgress(
+  userId: string,
+  levelId: string,
+  progress: VersionProgress,
+): Promise<VersionProgress> {
+  if (!userId.trim() || !levelId.trim()) {
+    throw new Error('Utente o livello non valido.')
+  }
+
+  const now = new Date().toISOString()
+  const finalized: VersionProgress = {
+    ...progress,
+    levelId,
+    userId,
+    activeSegmentId: null,
+    status: 'pending_evaluation',
+    submittedAt: progress.submittedAt ?? now,
+    completedAt: progress.completedAt ?? now,
+    updatedAt: now,
+  }
+
+  await setDoc(
+    getVersionProgressDocRef(userId, levelId),
+    {
+      ...finalized,
+      completedAt: serverTimestamp(),
+      savedAt: serverTimestamp(),
+    },
+    { merge: true },
+  )
+
+  return finalized
 }
 
 export async function getVersionProgress(
