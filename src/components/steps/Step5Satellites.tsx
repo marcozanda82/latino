@@ -7,7 +7,7 @@ import {
   CASE_CHIP_LABELS,
   CASE_CHIP_VARIANTS,
   CASE_ERROR_TOAST,
-  isCaseCorrect,
+  isComplementCaseCorrect,
   VALID_CASES,
   type LatinCase,
 } from '../../utils/caseAnalysis'
@@ -132,7 +132,7 @@ export function Step5Satellites({
   const handleCaseSelect = (caseValue: LatinCase) => {
     if (caseLocked) return
 
-    if (isCaseCorrect(caseValue, current.caso)) {
+    if (isComplementCaseCorrect(caseValue, current.parole, current.caso)) {
       setSelectedCase(caseValue)
       setCaseLocked(true)
       setShakingCase(null)

@@ -1,5 +1,6 @@
 import type { Complemento, LatinAnalysis, TranslationValue } from '../types'
 import { isValidCase } from './caseAnalysis'
+import { isInvariableWord } from './grammatica'
 import { getPrimaryTranslation } from './textNormalization'
 import { isPunctuation, withoutPunctuation } from './stringUtils'
 import { getVerbParoleFromCorretta } from './verbAnalysis'
@@ -32,11 +33,83 @@ export function isPunctuationOnlyComplement(complemento: Complemento): boolean {
   )
 }
 
+function buildInvariableComplement(word: string, traduzione: TranslationValue): Complemento {
+  return {
+    parole: [word],
+    caso: 'indeclinabile',
+    traduzione,
+  }
+}
+
+/** Separa le parole invariabili inglobate erroneamente in blocchi misti. */
+export function expandInvariableComplementi(
+  complementi: Complemento[],
+): Complemento[] {
+  const expanded: Complemento[] = []
+
+  for (const complemento of complementi) {
+    if (isPunctuationOnlyComplement(complemento)) continue
+
+    const hasInvariable = complemento.parole.some((word) => isInvariableWord(word))
+    if (!hasInvariable) {
+      expanded.push(complemento)
+      continue
+    }
+
+    const hasVariable = complemento.parole.some(
+      (word) => !isInvariableWord(word) && !isPunctuation(word),
+    )
+
+    if (!hasVariable) {
+      for (const word of complemento.parole) {
+        if (isPunctuation(word)) continue
+        expanded.push(
+          buildInvariableComplement(
+            word,
+            complemento.parole.length === 1
+              ? complemento.traduzione
+              : word,
+          ),
+        )
+      }
+      continue
+    }
+
+    let variableBuffer: string[] = []
+
+    const flushVariableBuffer = () => {
+      if (variableBuffer.length === 0) return
+      expanded.push({
+        parole: [...variableBuffer],
+        caso: complemento.caso,
+        traduzione: complemento.traduzione,
+      })
+      variableBuffer = []
+    }
+
+    for (const word of complemento.parole) {
+      if (isPunctuation(word)) continue
+
+      if (isInvariableWord(word)) {
+        flushVariableBuffer()
+        expanded.push(buildInvariableComplement(word, word))
+        continue
+      }
+
+      variableBuffer.push(word)
+    }
+
+    flushVariableBuffer()
+  }
+
+  return expanded
+}
+
 /** Complementi che lo studente deve classificare nello Step 5. */
 export function getInteractiveComplementi(
   complementi: Complemento[],
 ): Complemento[] {
-  return complementi.filter(
+  return expandInvariableComplementi(complementi).filter(
     (complemento) => !isPunctuationOnlyComplement(complemento),
   )
 }

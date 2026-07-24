@@ -1,3 +1,5 @@
+import { isIndeclinableShieldMatch } from './grammatica'
+
 export const VALID_CASES = [
   'nominativo',
   'genitivo',
@@ -47,6 +49,19 @@ export function normalizeCase(value: string): string {
 
 export function isCaseCorrect(selected: string, expected: string): boolean {
   return normalizeCase(selected) === normalizeCase(expected)
+}
+
+/** Valuta il caso scelto per un complemento, con Indeclinable Shield. */
+export function isComplementCaseCorrect(
+  selectedCase: string,
+  parole: string[],
+  expectedCase: string,
+): boolean {
+  if (isIndeclinableShieldMatch(parole, selectedCase)) {
+    return true
+  }
+
+  return isCaseCorrect(selectedCase, expectedCase)
 }
 
 export function isValidCase(value: string): value is LatinCase {
