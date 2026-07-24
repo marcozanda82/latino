@@ -1,4 +1,4 @@
-import { doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore'
+import { doc, getDoc, serverTimestamp, setDoc, collection, getDocs } from 'firebase/firestore'
 import { db } from '../config/firebase'
 import type { ExerciseDraftData } from '../types/exerciseDraft'
 import type {
@@ -332,6 +332,35 @@ export async function saveVersionProgress(
     )
   } catch (error) {
     console.error('[versionProgressService] saveVersionProgress failed:', error)
+    throw error
+  }
+}
+
+export async function listVersionProgressForUser(
+  userId: string,
+): Promise<VersionProgress[]> {
+  if (!userId.trim()) return []
+
+  try {
+    const snapshot = await getDocs(
+      collection(
+        db,
+        USERS_COLLECTION,
+        userId,
+        VERSION_PROGRESS_SUBCOLLECTION,
+      ),
+    )
+
+    return snapshot.docs
+      .map((docSnap) =>
+        normalizeVersionProgress(docSnap.id, docSnap.data()),
+      )
+      .filter((item): item is VersionProgress => item !== null)
+  } catch (error) {
+    console.error(
+      '[versionProgressService] listVersionProgressForUser failed:',
+      error,
+    )
     throw error
   }
 }

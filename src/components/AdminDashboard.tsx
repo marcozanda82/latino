@@ -19,7 +19,9 @@ import { updateLevelCompensation, isSentenceLevel, isVersionLevel, getLevelPrevi
 import { calculateMaxSesterziReward } from '../utils/gamification'
 import { getExistingGroupNames, groupLevelsByName } from '../utils/levelGroups'
 import { usePendingEvaluations } from '../hooks/usePendingEvaluations'
+import { useStuckExercises } from '../hooks/useStuckExercises'
 import { TutorDashboard } from './TutorDashboard'
+import { StuckExercisesPanel } from './StuckExercisesPanel'
 import { TutorRewardsManager } from './TutorRewardsManager'
 import { TutorTransactionsManager } from './TutorTransactionsManager'
 import { VERSION_AI_PROMPT, SENTENCE_AI_PROMPT } from '../constants/aiPrompt'
@@ -90,6 +92,13 @@ export function AdminDashboard() {
     handleApproveVersion,
     handleReset,
   } = usePendingEvaluations()
+
+  const {
+    stuckExercises,
+    loading: stuckLoading,
+    forcingId,
+    handleForceComplete,
+  } = useStuckExercises(levels, allEvaluations)
 
   const existingGroupNames = useMemo(
     () => getExistingGroupNames(levels),
@@ -391,14 +400,23 @@ export function AdminDashboard() {
         {activeTab === 'economia' && <TutorTransactionsManager />}
 
         {activeTab === 'valutazioni' && (
-          <TutorDashboard
-            evaluations={allEvaluations}
-            evaluatingId={evaluatingId}
-            resettingId={resettingId}
-            onEvaluate={handleEvaluate}
-            onApproveVersion={handleApproveVersion}
-            onReset={handleReset}
-          />
+          <div className="space-y-8">
+            <StuckExercisesPanel
+              exercises={stuckExercises}
+              loading={stuckLoading}
+              forcingId={forcingId}
+              onForceComplete={handleForceComplete}
+            />
+
+            <TutorDashboard
+              evaluations={allEvaluations}
+              evaluatingId={evaluatingId}
+              resettingId={resettingId}
+              onEvaluate={handleEvaluate}
+              onApproveVersion={handleApproveVersion}
+              onReset={handleReset}
+            />
+          </div>
         )}
 
         {activeTab === 'obiettivi' && (

@@ -15,13 +15,13 @@ export function buildDraftDocId(userId: string, exerciseId: string): string {
   return `${userId}_${exerciseId}`
 }
 
+export function getDraftDocRefForUser(userId: string, exerciseId: string) {
+  return doc(db, DRAFTS_COLLECTION, buildDraftDocId(userId, exerciseId))
+}
+
 function getDraftDocRef(exerciseId: string) {
   const userId = getStudentUserId()
-  return doc(
-    db,
-    DRAFTS_COLLECTION,
-    buildDraftDocId(userId, exerciseId),
-  )
+  return getDraftDocRefForUser(userId, exerciseId)
 }
 
 function normalizeDraftData(
@@ -90,15 +90,44 @@ function normalizeDraftData(
 export async function fetchExerciseDraft(
   exerciseId: string,
 ): Promise<ExerciseDraftData | null> {
-  if (!exerciseId.trim()) return null
+  return fetchExerciseDraftForUser(getStudentUserId(), exerciseId)
+}
+
+export async function fetchExerciseDraftForUser(
+  userId: string,
+  exerciseId: string,
+): Promise<ExerciseDraftData | null> {
+  if (!exerciseId.trim() || !userId.trim()) return null
 
   try {
-    const snapshot = await getDoc(getDraftDocRef(exerciseId))
+    const snapshot = await getDoc(getDraftDocRefForUser(userId, exerciseId))
     if (!snapshot.exists()) return null
     return normalizeDraftData(exerciseId, snapshot.data())
   } catch (error) {
-    console.error('[draftService] fetchExerciseDraft failed:', error)
+    console.error('[draftService] fetchExerciseDraftForUser failed:', error)
     return null
+  }
+}
+
+export async function markDraftPendingEvaluation(
+  userId: string,
+  exerciseId: string,
+): Promise<void> {
+  if (!exerciseId.trim() || !userId.trim()) return
+
+  try {
+    await setDoc(
+      getDraftDocRefForUser(userId, exerciseId),
+      {
+        status: 'pending_evaluation',
+        completedAt: serverTimestamp(),
+        forcedByTutor: true,
+      },
+      { merge: true },
+    )
+  } catch (error) {
+    console.error('[draftService] markDraftPendingEvaluation failed:', error)
+    throw error
   }
 }
 
