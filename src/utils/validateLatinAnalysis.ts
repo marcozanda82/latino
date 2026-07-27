@@ -3,7 +3,7 @@ import {
   validateComplementStructure,
   validateComplementsCoherence,
 } from './complements'
-import { isValidForm, isValidModo, verbMatchesParoleArray } from './verbAnalysis'
+import { isValidForm, isValidModo, isIndefiniteMode, verbMatchesParoleArray } from './verbAnalysis'
 
 function isTranslationValue(value: unknown): value is TranslationValue {
   if (typeof value === 'string') return true
@@ -21,6 +21,31 @@ function extractJsonContent(raw: string): string {
   const trimmed = raw.trim()
   const fenced = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/)
   return fenced ? fenced[1].trim() : trimmed
+}
+
+function isValidStep2AnalisiVerbo(step2: Record<string, unknown>): boolean {
+  if (typeof step2.modo !== 'string' || !isValidModo(step2.modo)) return false
+  if (typeof step2.tempo !== 'string' || !step2.tempo.trim()) return false
+  if (typeof step2.forma !== 'string' || !isValidForm(step2.forma)) return false
+
+  const indefinite = isIndefiniteMode(step2.modo)
+
+  if (!indefinite) {
+    if (typeof step2.persona !== 'string' || !step2.persona.trim()) return false
+    if (typeof step2.numero !== 'string' || !step2.numero.trim()) return false
+    return true
+  }
+
+  const personaValid =
+    step2.persona === undefined ||
+    step2.persona === null ||
+    typeof step2.persona === 'string'
+  const numeroValid =
+    step2.numero === undefined ||
+    step2.numero === null ||
+    typeof step2.numero === 'string'
+
+  return personaValid && numeroValid
 }
 
 export function isLatinAnalysis(value: unknown): value is LatinAnalysis {
@@ -41,13 +66,7 @@ export function isLatinAnalysis(value: unknown): value is LatinAnalysis {
     typeof step1.spiegazione_errore === 'string' &&
     typeof step2 === 'object' &&
     step2 !== null &&
-    typeof step2.modo === 'string' &&
-    isValidModo(step2.modo) &&
-    typeof step2.tempo === 'string' &&
-    typeof step2.persona === 'string' &&
-    typeof step2.numero === 'string' &&
-    typeof step2.forma === 'string' &&
-    isValidForm(step2.forma) &&
+    isValidStep2AnalisiVerbo(step2) &&
     typeof step3 === 'object' &&
     step3 !== null &&
     Array.isArray(step3.parole_corrette) &&

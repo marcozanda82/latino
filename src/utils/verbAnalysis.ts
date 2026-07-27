@@ -29,6 +29,8 @@ export const VERB_CATEGORY_ORDER: VerbCategory[] = [
   'forma',
 ]
 
+const INDEFINITE_MODE_SKIPPED_CATEGORIES: VerbCategory[] = ['persona', 'numero']
+
 export const VERB_CATEGORY_LABELS: Record<VerbCategory, string> = {
   modo: 'Modo',
   persona: 'Persona',
@@ -152,6 +154,19 @@ export function isInfinitoMode(value: string): boolean {
   return normalizeModo(value) === 'infinito'
 }
 
+export function isIndefiniteMode(value: string): boolean {
+  const normalized = normalizeModo(value)
+  return normalized === 'infinito' || normalized === 'participio'
+}
+
+export function isVerbCategoryRequired(
+  category: VerbCategory,
+  modo?: string,
+): boolean {
+  if (!modo || !isIndefiniteMode(modo)) return true
+  return !INDEFINITE_MODE_SKIPPED_CATEGORIES.includes(category)
+}
+
 export function canonicalizeTempo(value: string, modo?: string): string {
   const compact = compactNormalized(value)
   const normalizedModo = modo ? normalizeModo(modo) : ''
@@ -269,7 +284,7 @@ function tempoOptionMatchesExpected(
 function ensureExpectedOption(
   category: VerbCategory,
   options: string[],
-  expected: string,
+  expected: string | null | undefined,
   modo?: string,
 ): string[] {
   if (!expected?.trim()) return options
@@ -328,10 +343,13 @@ export function getVerbCategoryOptions(
 export function getRequiredVerbCategories(
   _completed: Record<VerbCategory, boolean>,
   selectedAnswers: Partial<Record<VerbCategory, string>>,
+  expectedModo?: string,
 ): VerbCategory[] {
-  const modoAnswer = selectedAnswers.modo
-  if (modoAnswer && isInfinitoMode(modoAnswer)) {
-    return VERB_CATEGORY_ORDER.filter((category) => category !== 'persona')
+  const modoAnswer = selectedAnswers.modo ?? expectedModo
+  if (modoAnswer && isIndefiniteMode(modoAnswer)) {
+    return VERB_CATEGORY_ORDER.filter((category) =>
+      isVerbCategoryRequired(category, modoAnswer),
+    )
   }
   return VERB_CATEGORY_ORDER
 }
@@ -364,10 +382,23 @@ export function normalizeVerbAnswer(
 export function isVerbAnswerCorrect(
   category: VerbCategory,
   selected: string,
-  expected: string,
+  expected: string | null | undefined,
   modo?: string,
 ): boolean {
-  if (!selected?.trim() || !expected?.trim()) return false
+  if (
+    isIndefiniteMode(modo ?? '') &&
+    INDEFINITE_MODE_SKIPPED_CATEGORIES.includes(category)
+  ) {
+    return true
+  }
+
+  if (!selected?.trim()) return false
+  if (!expected?.trim()) {
+    return (
+      isIndefiniteMode(modo ?? '') &&
+      INDEFINITE_MODE_SKIPPED_CATEGORIES.includes(category)
+    )
+  }
 
   if (category === 'tempo') {
     return tempoOptionMatchesExpected(selected, expected, modo)
@@ -388,14 +419,34 @@ export function sanitizeStep2State(
   selectedAnswers: Partial<Record<VerbCategory, string>>
 } {
   const modo = selectedAnswers.modo ?? analisiVerbo.modo
+  const indefinite = isIndefiniteMode(modo)
   const nextCompleted = { ...completed }
   const nextSelected: Partial<Record<VerbCategory, string>> = {}
 
+  if (indefinite) {
+    for (const category of INDEFINITE_MODE_SKIPPED_CATEGORIES) {
+      nextCompleted[category] = true
+    }
+  }
+
   for (const category of VERB_CATEGORY_ORDER) {
+    if (indefinite && INDEFINITE_MODE_SKIPPED_CATEGORIES.includes(category)) {
+      continue
+    }
+
     const selected = selectedAnswers[category]
     const expected = analisiVerbo[category]
 
-    if (!selected?.trim() || !expected?.trim()) {
+    if (!selected?.trim()) {
+      nextCompleted[category] = false
+      continue
+    }
+
+    if (!expected?.trim()) {
+      if (indefinite && INDEFINITE_MODE_SKIPPED_CATEGORIES.includes(category)) {
+        nextCompleted[category] = true
+        continue
+      }
       nextCompleted[category] = false
       continue
     }
@@ -407,14 +458,6 @@ export function sanitizeStep2State(
     }
 
     nextCompleted[category] = false
-  }
-
-  if (
-    nextCompleted.modo &&
-    nextSelected.modo &&
-    isInfinitoMode(nextSelected.modo)
-  ) {
-    nextCompleted.persona = true
   }
 
   return { completed: nextCompleted, selectedAnswers: nextSelected }

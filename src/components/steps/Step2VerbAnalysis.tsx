@@ -5,8 +5,9 @@ import {
   formatVerbDisplay,
   getRequiredVerbCategories,
   getVerbCategoryOptions,
-  isInfinitoMode,
+  isIndefiniteMode,
   isVerbAnswerCorrect,
+  isVerbCategoryRequired,
   sanitizeStep2State,
   VERB_CATEGORY_LABELS,
   VERB_CATEGORY_ORDER,
@@ -131,37 +132,59 @@ export function Step2VerbAnalysis({
     onStateSnapshot?.({ completed, selectedAnswers })
   }, [completed, selectedAnswers, onStateSnapshot])
 
-  const isInfinitoSelected =
-    selectedAnswers.modo !== undefined && isInfinitoMode(selectedAnswers.modo)
-
   const effectiveModo = selectedAnswers.modo ?? analisiVerbo.modo
+  const isIndefiniteSelected = isIndefiniteMode(effectiveModo)
 
-  const requiredCategories = getRequiredVerbCategories(completed, selectedAnswers)
+  const requiredCategories = getRequiredVerbCategories(
+    completed,
+    selectedAnswers,
+    analisiVerbo.modo,
+  )
   const allComplete = requiredCategories.every((category) => completed[category])
 
   const handleSelect = useCallback(
     (category: VerbCategory, label: string) => {
       if (selectedAnswers[category]) return
-      if (category === 'persona' && isInfinitoSelected) return
+      if (
+        !isVerbCategoryRequired(category, effectiveModo) ||
+        (isIndefiniteSelected &&
+          (category === 'persona' || category === 'numero'))
+      ) {
+        return
+      }
 
-      const expected = analisiVerbo[category]
+      const expected = analisiVerbo[category] ?? ''
       const chipKey = `${category}-${label}`
+      const modoForCheck = category === 'modo' ? label : effectiveModo
 
-      if (isVerbAnswerCorrect(category, label, expected, effectiveModo)) {
+      if (isVerbAnswerCorrect(category, label, expected, modoForCheck)) {
         let nextCompleted = { ...completed, [category]: true }
+        const nextSelected: Partial<Record<VerbCategory, string>> = {
+          ...selectedAnswers,
+          [category]: label,
+        }
 
-        if (category === 'modo' && isInfinitoMode(label)) {
-          nextCompleted = { ...nextCompleted, persona: true }
+        if (category === 'modo') {
+          if (isIndefiniteMode(label)) {
+            nextCompleted = { ...nextCompleted, persona: true, numero: true }
+            delete nextSelected.persona
+            delete nextSelected.numero
+          } else if (isIndefiniteMode(selectedAnswers.modo ?? '')) {
+            nextCompleted = { ...nextCompleted, persona: false, numero: false }
+            delete nextSelected.persona
+            delete nextSelected.numero
+          }
         }
 
         setCompleted(nextCompleted)
-        setSelectedAnswers((prev) => ({ ...prev, [category]: label }))
+        setSelectedAnswers(nextSelected)
         setErrorChip(null)
 
-        const nextRequired = getRequiredVerbCategories(nextCompleted, {
-          ...selectedAnswers,
-          [category]: label,
-        })
+        const nextRequired = getRequiredVerbCategories(
+          nextCompleted,
+          nextSelected,
+          analisiVerbo.modo,
+        )
 
         if (nextRequired.every((item) => nextCompleted[item])) {
           onComplete()
@@ -182,12 +205,12 @@ export function Step2VerbAnalysis({
     [
       analisiVerbo,
       completed,
-      isInfinitoSelected,
+      effectiveModo,
+      isIndefiniteSelected,
       onComplete,
       onError,
       onMistake,
       selectedAnswers,
-      effectiveModo,
     ],
   )
 
@@ -212,9 +235,12 @@ export function Step2VerbAnalysis({
 
       <div className="flex flex-col gap-6">
         {VERB_CATEGORY_ORDER.map((category) => {
-          const isSkippedForInfinito = category === 'persona' && isInfinitoSelected
+          if (!isVerbCategoryRequired(category, effectiveModo)) {
+            return null
+          }
+
           const hasSelection = Boolean(selectedAnswers[category])
-          const isLocked = hasSelection || isSkippedForInfinito
+          const isLocked = hasSelection
           const selected = selectedAnswers[category]
           const options = getVerbCategoryOptions(
             category,
@@ -225,22 +251,12 @@ export function Step2VerbAnalysis({
           return (
             <section
               key={category}
-              className={[
-                'relative isolate rounded-xl border bg-white p-5',
-                isSkippedForInfinito
-                  ? 'border-slate-100 bg-slate-50/80'
-                  : 'border-slate-200',
-              ].join(' ')}
+              className="relative isolate rounded-xl border border-slate-200 bg-white p-5"
             >
               <div className="mb-4 flex items-center justify-between gap-3">
                 <h3 className="text-sm font-semibold text-slate-700">
                   {VERB_CATEGORY_LABELS[category]}
                 </h3>
-                {isSkippedForInfinito && (
-                  <span className="text-xs font-medium text-slate-400">
-                    Non applicabile per l&apos;infinito
-                  </span>
-                )}
               </div>
 
               <div className="relative z-20 pointer-events-auto flex flex-wrap gap-2.5">

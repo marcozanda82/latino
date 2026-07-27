@@ -10,8 +10,10 @@ export type VerbForm = 'attiva' | 'passiva'
 export interface Step2AnalisiVerbo {
   modo: string
   tempo: string
-  persona: string
-  numero: string
+  /** Non applicabile per infinito e participio. */
+  persona?: string | null
+  /** Non applicabile per infinito e participio. */
+  numero?: string | null
   forma: VerbForm
 }
 
