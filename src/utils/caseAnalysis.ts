@@ -1,4 +1,7 @@
-import { isIndeclinableShieldMatch } from './grammatica'
+import {
+  areInvariableCasesSynonymous,
+  isInvariableShieldMatch,
+} from './grammatica'
 
 export const VALID_CASES = [
   'nominativo',
@@ -9,6 +12,7 @@ export const VALID_CASES = [
   'ablativo',
   'locativo',
   'indeclinabile',
+  'congiunzione',
   'subordinata',
 ] as const
 
@@ -23,13 +27,15 @@ export const CASE_CHIP_LABELS: Record<LatinCase, string> = {
   ablativo: 'Ablativo',
   locativo: 'Locativo',
   indeclinabile: 'Indeclinabile',
+  congiunzione: 'Congiunzione',
   subordinata: 'Subordinata',
 }
 
 export const CASE_CHIP_VARIANTS: Partial<
-  Record<LatinCase, 'default' | 'subordinate'>
+  Record<LatinCase, 'default' | 'subordinate' | 'conjunction'>
 > = {
   subordinata: 'subordinate',
+  congiunzione: 'conjunction',
 }
 
 export const CASE_ERROR_TOAST =
@@ -57,7 +63,11 @@ export function isComplementCaseCorrect(
   parole: string[],
   expectedCase: string,
 ): boolean {
-  if (isIndeclinableShieldMatch(parole, selectedCase)) {
+  if (isInvariableShieldMatch(parole, selectedCase)) {
+    return true
+  }
+
+  if (areInvariableCasesSynonymous(selectedCase, expectedCase, parole)) {
     return true
   }
 

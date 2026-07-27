@@ -21,7 +21,7 @@ Regole rigorose per l'analisi:
 - \`step2_analisi_verbo.tempo\`: Usa le diciture standard esatte (es. "presente", "imperfetto", "futuro semplice", "perfetto", "piuccheperfetto", "futuro anteriore").
 - \`step3_soggetto.parole_corrette\`: Le parole del soggetto (se sottinteso, array vuoto e \`sottinteso: true\`).
 - \`step4_nucleo_tradotto\`: Traduzione del verbo + soggetto in italiano (accetta stringa o array di varianti).
-- \`step5_complementi\`: Array di oggetti. I complementi devono coprire ESATTAMENTE tutte e sole le parole di \`parole_array\` che non fanno parte del verbo o del soggetto. \`caso\` deve essere uno tra [genitivo, dativo, accusativo, vocativo, ablativo, locativo, indeclinabile, subordinata].
+- \`step5_complementi\`: Array di oggetti. I complementi devono coprire ESATTAMENTE tutte e sole le parole di \`parole_array\` che non fanno parte del verbo o del soggetto. \`caso\` deve essere uno tra [genitivo, dativo, accusativo, vocativo, ablativo, locativo, indeclinabile, congiunzione, subordinata].
 - VERIFICA FINALE: La somma delle parole usate in step 1, step 3 e step 5 deve ricostruire l'intero \`parole_array\`.
 
 STRUTTURA JSON RICHIESTA (Esempio per una frase, ma tu restituisci l'array con tutte le frasi richieste):
@@ -76,7 +76,7 @@ Regole rigorose per l'oggetto \`analisi\`:
 - \`step2_analisi_verbo.tempo\`: Usa le diciture standard esatte (es. "presente", "imperfetto", "futuro semplice", "perfetto", "piuccheperfetto", "futuro anteriore").
 - \`step3_soggetto.parole_corrette\`: Le parole del soggetto (se sottinteso, array vuoto e \`sottinteso: true\`).
 - \`step4_nucleo_tradotto\`: Traduzione del verbo + soggetto in italiano (accetta stringa o array di varianti).
-- \`step5_complementi\`: Array di oggetti. I complementi devono coprire ESATTAMENTE tutte e sole le parole di \`parole_array\` che non fanno parte del verbo o del soggetto. \`caso\` deve essere uno tra [genitivo, dativo, accusativo, vocativo, ablativo, locativo, indeclinabile, subordinata].
+- \`step5_complementi\`: Array di oggetti. I complementi devono coprire ESATTAMENTE tutte e sole le parole di \`parole_array\` che non fanno parte del verbo o del soggetto. \`caso\` deve essere uno tra [genitivo, dativo, accusativo, vocativo, ablativo, locativo, indeclinabile, congiunzione, subordinata].
 - VERIFICA FINALE: La somma delle parole usate in step 1, step 3 e step 5 deve ricostruire l'intero \`parole_array\`.
 - Non includere il campo \`coefficiente\` nei segmenti versione.
 

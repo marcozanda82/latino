@@ -71,7 +71,9 @@ function CaseChip({
           ? 'border-emerald-500 bg-emerald-500 text-white shadow-sm shadow-emerald-200'
           : variant === 'subordinate'
             ? 'border-indigo-200 bg-indigo-50 text-indigo-700 can-hover:hover:border-indigo-300 can-hover:hover:bg-indigo-100'
-            : 'border-slate-200 bg-white text-slate-700 can-hover:hover:border-slate-300 can-hover:hover:bg-slate-50',
+            : variant === 'conjunction'
+              ? 'border-teal-200 bg-teal-50 text-teal-800 can-hover:hover:border-teal-300 can-hover:hover:bg-teal-100'
+              : 'border-slate-200 bg-white text-slate-700 can-hover:hover:border-slate-300 can-hover:hover:bg-slate-50',
         isLocked && !isSelected ? 'pointer-events-none opacity-40' : 'cursor-pointer',
       ]
         .filter(Boolean)

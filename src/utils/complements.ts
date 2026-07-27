@@ -1,6 +1,6 @@
 import type { Complemento, LatinAnalysis, TranslationValue } from '../types'
 import { isValidCase } from './caseAnalysis'
-import { isInvariableWord } from './grammatica'
+import { getDefaultCaseForInvariableWord, isInvariableWord } from './grammatica'
 import { getPrimaryTranslation } from './textNormalization'
 import { isPunctuation, withoutPunctuation } from './stringUtils'
 import { getVerbParoleFromCorretta } from './verbAnalysis'
@@ -36,7 +36,7 @@ export function isPunctuationOnlyComplement(complemento: Complemento): boolean {
 function buildInvariableComplement(word: string, traduzione: TranslationValue): Complemento {
   return {
     parole: [word],
-    caso: 'indeclinabile',
+    caso: getDefaultCaseForInvariableWord(word),
     traduzione,
   }
 }
