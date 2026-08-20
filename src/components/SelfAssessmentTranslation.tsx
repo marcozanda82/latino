@@ -1,6 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
+import { Mic, MicOff } from 'lucide-react'
 import type { TranslationValue } from '../types'
+import { useSpeechToText } from '../hooks/useSpeechToText'
 import {
   getPrimaryTranslation,
   matchesTranslation,
@@ -33,6 +35,15 @@ export function SelfAssessmentTranslation({
   const [isVerified, setIsVerified] = useState(false)
   const [isAutoSuccess, setIsAutoSuccess] = useState(initialConfirmed)
   const [isSuccess, setIsSuccess] = useState(initialConfirmed)
+  const speechBaseRef = useRef('')
+
+  const {
+    isListening,
+    transcript,
+    startListening,
+    stopListening,
+    isSupported,
+  } = useSpeechToText()
 
   const primaryReference = getPrimaryTranslation(referenceTranslation)
   const inputLocked = isVerified || isSuccess
@@ -40,6 +51,40 @@ export function SelfAssessmentTranslation({
   useEffect(() => {
     onSuccessChange?.(isSuccess)
   }, [isSuccess, onSuccessChange])
+
+  useEffect(() => {
+    if (!transcript.trim()) return
+
+    const base = speechBaseRef.current.trim()
+    const spoken = transcript.trim()
+    const nextValue = base ? `${base} ${spoken}` : spoken
+    setTranslation(nextValue)
+  }, [transcript])
+
+  useEffect(() => {
+    if (inputLocked && isListening) {
+      stopListening()
+    }
+  }, [inputLocked, isListening, stopListening])
+
+  useEffect(() => {
+    if (!isListening) return
+    return () => {
+      stopListening()
+    }
+  }, [isListening, stopListening])
+
+  const handleMicToggle = () => {
+    if (inputLocked) return
+
+    if (isListening) {
+      stopListening()
+      return
+    }
+
+    speechBaseRef.current = translation
+    startListening()
+  }
 
   const confirmTranslation = (text: string) => {
     onTranslationConfirmed?.(text.trim())
@@ -75,21 +120,55 @@ export function SelfAssessmentTranslation({
       <label htmlFor={inputId} className="sr-only">
         Traduzione del blocco
       </label>
-      <input
-        id={inputId}
-        type="text"
-        value={translation}
-        onChange={(event) => setTranslation(event.target.value)}
-        placeholder={placeholder}
-        disabled={inputLocked}
-        readOnly={inputLocked}
-        className={[
-          'w-full rounded-lg border bg-white px-4 py-3 text-base text-slate-800 shadow-sm outline-none transition-colors placeholder:text-slate-400 focus:border-slate-400 disabled:cursor-default disabled:text-slate-700',
-          isAutoSuccess
-            ? 'border-emerald-400 bg-emerald-50 disabled:bg-emerald-50'
-            : 'border-slate-200 disabled:bg-slate-50',
-        ].join(' ')}
-      />
+      <div className="relative">
+        <input
+          id={inputId}
+          type="text"
+          value={translation}
+          onChange={(event) => setTranslation(event.target.value)}
+          placeholder={placeholder}
+          disabled={inputLocked}
+          readOnly={inputLocked}
+          className={[
+            'w-full rounded-lg border bg-white py-3 text-base text-slate-800 shadow-sm outline-none transition-colors placeholder:text-slate-400 focus:border-slate-400 disabled:cursor-default disabled:text-slate-700',
+            isSupported && !inputLocked ? 'pl-4 pr-12' : 'px-4',
+            isAutoSuccess
+              ? 'border-emerald-400 bg-emerald-50 disabled:bg-emerald-50'
+              : 'border-slate-200 disabled:bg-slate-50',
+          ].join(' ')}
+        />
+
+        {isSupported && !inputLocked && (
+          <motion.button
+            type="button"
+            onClick={handleMicToggle}
+            aria-label={isListening ? 'Ferma dettatura' : 'Avvia dettatura vocale'}
+            aria-pressed={isListening}
+            animate={
+              isListening
+                ? { scale: [1, 1.08, 1], opacity: [1, 0.85, 1] }
+                : { scale: 1, opacity: 1 }
+            }
+            transition={
+              isListening
+                ? { duration: 1.2, repeat: Infinity, ease: 'easeInOut' }
+                : { duration: 0.2 }
+            }
+            className={[
+              'absolute right-2 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full border transition-colors',
+              isListening
+                ? 'border-red-300 bg-red-50 text-red-600 can-hover:hover:bg-red-100'
+                : 'border-slate-200 bg-white text-slate-500 can-hover:hover:border-slate-300 can-hover:hover:bg-slate-50 can-hover:hover:text-slate-700',
+            ].join(' ')}
+          >
+            {isListening ? (
+              <MicOff className="h-4 w-4" aria-hidden="true" />
+            ) : (
+              <Mic className="h-4 w-4" aria-hidden="true" />
+            )}
+          </motion.button>
+        )}
+      </div>
 
       {!isVerified && !isSuccess && (
         <button
