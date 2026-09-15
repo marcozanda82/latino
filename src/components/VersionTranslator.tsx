@@ -4,13 +4,15 @@ import { AppLayout } from './layout/AppLayout'
 import { GlassCard } from './ui/GlassCard'
 import { LevelCardsSkeleton } from './ui/Skeletons'
 import {
-  SentenceExerciseFlow,
-  type SentenceExerciseCompleteResult,
-} from './SentenceExerciseFlow'
+  PeriodAnalysisFlow,
+} from './PeriodAnalysisFlow'
+import type { SentenceExerciseCompleteResult } from './SentenceExerciseFlow'
 import { showError, showSuccess } from '../lib/toast'
 import { submitVersionForReview } from '../services/firebaseEvaluations'
 import { useVersionProgress } from '../hooks/useVersionProgress'
-import { buildFullTranslation } from '../utils/complements'
+import {
+  buildVersionSegmentFullTranslation,
+} from '../utils/proposizione'
 import {
   areAllVersionSegmentsCompleted,
   finalizeVersionProgress,
@@ -87,7 +89,7 @@ function buildSegmentSubmissionsFromProgress(
       mechanicalScore: segmentProgress?.mechanicalScore ?? 0,
       compensoAssegnato: segment.compenso_assegnato,
       xpScore: segmentProgress?.xpScore,
-      traduzioneAttesa: buildFullTranslation(segment.analisi),
+      traduzioneAttesa: buildVersionSegmentFullTranslation(segment),
       stepAnswers: segmentProgress?.stepAnswers,
     }
   })
@@ -442,15 +444,12 @@ export function VersionTranslator({
     return (
       <>
         {completionModal}
-        <SentenceExerciseFlow
+        <PeriodAnalysisFlow
           key={activeSegment.id}
-          mode="version-segment"
-          analysis={activeSegment.analisi}
+          segment={activeSegment}
           title={`${title} · Segmento ${activeIndex + 1}`}
           segmentMaxReward={activeSegment.compenso_assegnato}
           previousContext={previousContext}
-          hideTutorSubmit
-          initialDraft={progress.segments[activeSegment.id]?.draft}
           onCancel={handleCancelSegment}
           onComplete={(result) =>
             void handleSegmentComplete(activeSegment.id, result)

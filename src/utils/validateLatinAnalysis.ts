@@ -1,9 +1,11 @@
 import type { LatinAnalysis, TranslationValue } from '../types'
+import type { Proposizione } from '../types/version'
 import {
   validateComplementStructure,
   validateComplementsCoherence,
 } from './complements'
 import { isValidForm, isValidModo, isIndefiniteMode, verbMatchesParoleArray } from './verbAnalysis'
+import { proposizioneToLatinAnalysis } from './proposizione'
 
 function isTranslationValue(value: unknown): value is TranslationValue {
   if (typeof value === 'string') return true
@@ -46,6 +48,64 @@ function isValidStep2AnalisiVerbo(step2: Record<string, unknown>): boolean {
     typeof step2.numero === 'string'
 
   return personaValid && numeroValid
+}
+
+const PROPOSIZIONE_TIPI = ['principale', 'coordinata', 'subordinata'] as const
+
+function isValidProposizioneTipo(
+  value: unknown,
+): value is Proposizione['tipo_proposizione'] {
+  return (
+    typeof value === 'string' &&
+    PROPOSIZIONE_TIPI.includes(value as Proposizione['tipo_proposizione'])
+  )
+}
+
+function isValidProposizioneSteps(data: Record<string, unknown>): boolean {
+  const step1 = data.step1_verbo as Record<string, unknown> | undefined
+  const step2 = data.step2_analisi_verbo as Record<string, unknown> | undefined
+  const step3 = data.step3_soggetto as Record<string, unknown> | undefined
+
+  return (
+    Array.isArray(data.parole_array) &&
+    data.parole_array.every((word) => typeof word === 'string') &&
+    typeof step1 === 'object' &&
+    step1 !== null &&
+    typeof step1.parola_corretta === 'string' &&
+    typeof step1.spiegazione_errore === 'string' &&
+    typeof step2 === 'object' &&
+    step2 !== null &&
+    isValidStep2AnalisiVerbo(step2) &&
+    typeof step3 === 'object' &&
+    step3 !== null &&
+    Array.isArray(step3.parole_corrette) &&
+    step3.parole_corrette.every((word) => typeof word === 'string') &&
+    typeof step3.sottinteso === 'boolean' &&
+    isTranslationValue(data.step4_nucleo_tradotto) &&
+    validateComplementStructure(data.step5_complementi)
+  )
+}
+
+export function isProposizione(value: unknown): value is Proposizione {
+  if (!value || typeof value !== 'object') return false
+
+  const data = value as Record<string, unknown>
+
+  return (
+    (typeof data.id === 'string' || typeof data.id === 'number') &&
+    typeof data.testo_proposizione === 'string' &&
+    data.testo_proposizione.trim().length > 0 &&
+    isValidProposizioneTipo(data.tipo_proposizione) &&
+    isValidProposizioneSteps(data)
+  )
+}
+
+export function validateProposizioneCoherence(
+  proposizione: Proposizione,
+): string | null {
+  return validateLatinAnalysisCoherence(
+    proposizioneToLatinAnalysis(proposizione),
+  )
 }
 
 export function isLatinAnalysis(value: unknown): value is LatinAnalysis {

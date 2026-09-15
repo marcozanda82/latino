@@ -1,8 +1,8 @@
-import type { VersionExercise, VersionSegment } from '../types/version'
+import type { VersionExercise, VersionSegment, Proposizione } from '../types/version'
 import { isVersionExercise } from '../types/version'
 import {
-  isLatinAnalysis,
-  validateLatinAnalysisCoherence,
+  isProposizione,
+  validateProposizioneCoherence,
 } from './validateLatinAnalysis'
 
 export const VERSION_JSON_LOAD_ERROR =
@@ -38,29 +38,45 @@ function normalizeVersionPayload(value: unknown): unknown {
   return data
 }
 
-function validateSegmentAnalisi(analisi: unknown, segmentId: number) {
-  if (!isLatinAnalysis(analisi)) {
+function validateSegmentProposizioni(
+  proposizioni: unknown,
+  segmentId: number,
+): Proposizione[] {
+  if (!Array.isArray(proposizioni) || proposizioni.length === 0) {
     throw new VersionJsonLoadError(
-      `${VERSION_JSON_LOAD_ERROR} (segmento ${segmentId}: analisi non valida).`,
+      `${VERSION_JSON_LOAD_ERROR} (segmento ${segmentId}: serve almeno una proposizione).`,
     )
   }
 
-  const coherenceError = validateLatinAnalysisCoherence(analisi)
-  if (coherenceError) {
-    throw new VersionJsonLoadError(
-      `${VERSION_JSON_LOAD_ERROR} (segmento ${segmentId}: ${coherenceError}).`,
-    )
-  }
+  return proposizioni.map((proposizione, index) => {
+    const proposizioneId = index + 1
 
-  return analisi
+    if (!isProposizione(proposizione)) {
+      throw new VersionJsonLoadError(
+        `${VERSION_JSON_LOAD_ERROR} (segmento ${segmentId}, proposizione ${proposizioneId}: schema non valido).`,
+      )
+    }
+
+    const coherenceError = validateProposizioneCoherence(proposizione)
+    if (coherenceError) {
+      throw new VersionJsonLoadError(
+        `${VERSION_JSON_LOAD_ERROR} (segmento ${segmentId}, proposizione ${proposizioneId}: ${coherenceError}).`,
+      )
+    }
+
+    return proposizione
+  })
 }
 
 function normalizeSegment(segment: VersionSegment): VersionSegment {
-  const analisi = validateSegmentAnalisi(segment.analisi, segment.id)
+  const proposizioni = validateSegmentProposizioni(
+    segment.proposizioni,
+    segment.id,
+  )
 
   return {
     id: segment.id,
-    analisi,
+    proposizioni,
     note: segment.note?.trim() ? segment.note.trim() : '',
     ...(typeof segment.difficolta_percentuale === 'number'
       ? { difficolta_percentuale: segment.difficolta_percentuale }

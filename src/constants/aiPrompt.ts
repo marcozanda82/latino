@@ -64,23 +64,29 @@ REGOLE TASSATIVE PER L'OUTPUT:
 - Assegna a ciascuno una \`difficolta_percentuale\` (somma = 100).
 - Calcola il \`compenso_assegnato\` per ogni segmento moltiplicando la sua \`difficolta_percentuale\` per il compenso totale dei Sesterzi indicato all'inizio (es. se il totale è 1000 Sesterzi e la difficoltà è 15%, il compenso assegnato sarà 150). La somma di tutti i \`compenso_assegnato\` deve dare esattamente il totale dei Sesterzi.
 
-### FASE 2: Generazione JSON Completo
-Per OGNI segmento, genera l'oggetto \`analisi\` a 5 step rispettando rigorosamente lo schema sottostante.
+### FASE 2: Analisi del periodo (Segmenti → Proposizioni → 5 Step)
 
-Regole rigorose per l'oggetto \`analisi\`:
-- \`frase_originale\`: Il testo latino esatto del segmento.
-- \`parole_array\`: Array contenente ogni singola parola e segno di punteggiatura della \`frase_originale\`, nell'ordine esatto.
-- \`step1_verbo.parola_corretta\`: Deve essere identica a uno degli elementi in \`parole_array\`. Se è un verbo composto (es. "celebratae erunt"), inserisci entrambi i termini esatti.
-- \`step2_analisi_verbo.modo\`: Solo [indicativo, imperativo, infinito, participio, congiuntivo].
-- \`step2_analisi_verbo.forma\`: Solo [attiva, passiva].
-- \`step2_analisi_verbo.tempo\`: Usa le diciture standard esatte (es. "presente", "imperfetto", "futuro semplice", "perfetto", "piuccheperfetto", "futuro anteriore").
-- \`step3_soggetto.parole_corrette\`: Le parole del soggetto (se sottinteso, array vuoto e \`sottinteso: true\`).
-- \`step4_nucleo_tradotto\`: Traduzione del verbo + soggetto in italiano (accetta stringa o array di varianti).
-- \`step5_complementi\`: Array di oggetti. I complementi devono coprire ESATTAMENTE tutte e sole le parole di \`parole_array\` che non fanno parte del verbo o del soggetto. \`caso\` deve essere uno tra [genitivo, dativo, accusativo, vocativo, ablativo, locativo, indeclinabile, congiunzione, subordinata].
-- VERIFICA FINALE: La somma delle parole usate in step 1, step 3 e step 5 deve ricostruire l'intero \`parole_array\`.
-- Non includere il campo \`coefficiente\` nei segmenti versione.
+STRUTTURA JSON RICHIESTA:
+Restituisci un oggetto radice con \`tipo: "version"\` e un array \`segmenti\`.
+Ogni segmento deve avere \`segmento_id\`, \`testo_latino\`, \`compenso_assegnato\` (percentuale) e un array \`proposizioni\`.
+Nota per l'output JSON: usa \`id\` al posto di \`segmento_id\`; registra la percentuale in \`difficolta_percentuale\`; \`compenso_assegnato\` deve contenere il valore in Sesterzi (intero) calcolato come in FASE 1.
 
-STRUTTURA JSON DA RISPETTARE PERFETTAMENTE:
+REGOLE PER LE PROPOSIZIONI E ANALISI:
+1. Dividi il \`testo_latino\` del segmento in proposizioni logiche.
+2. Per ogni proposizione compila \`testo_proposizione\`, \`tipo_proposizione\` (SOLO valori: 'principale', 'coordinata', 'subordinata') e \`parole_array\`. La somma dei \`parole_array\` di tutte le proposizioni deve ricostruire il segmento intero, punteggiatura inclusa.
+3. All'interno di ogni proposizione, esegui i 5 step di analisi:
+   - \`step1_verbo\`: { parola_corretta, spiegazione_errore }
+   - \`step2_analisi_verbo\`: { modo, forma, tempo, persona, numero } (se indefinito, ometti persona e numero).
+   - \`step3_soggetto\`: { parole_corrette, sottinteso: booleano }
+   - \`step4_nucleo_tradotto\`: array di stringhe
+   - \`step5_complementi\`: array di { parole, caso, traduzione }. Il caso deve essere uno tra [genitivo, dativo, accusativo, vocativo, ablativo, locativo, indeclinabile, congiunzione].
+   - IMPORTANTE: nello step 5 non devi più usare 'subordinata' come caso, perché la natura della frase è già definita in \`tipo_proposizione\`.
+4. \`step1_verbo.parola_corretta\` deve essere identica a uno o più elementi consecutivi di \`parole_array\`. Se è un verbo composto (es. "celebratae erunt"), inserisci entrambi i termini esatti.
+5. \`step2_analisi_verbo.modo\`: Solo [indicativo, imperativo, infinito, participio, congiuntivo]. \`forma\`: Solo [attiva, passiva]. \`tempo\`: diciture standard esatte (es. "presente", "imperfetto", "futuro semplice", "perfetto", "piuccheperfetto", "futuro anteriore").
+6. VERIFICA FINALE (per ogni proposizione): la somma delle parole usate in step 1, step 3 e step 5 deve ricostruire l'intero \`parole_array\` della proposizione.
+7. Non includere il campo \`coefficiente\` nei segmenti versione.
+
+ESEMPIO JSON (schema da rispettare):
 {
   "titolo": "Titolo",
   "tipo": "version",
@@ -89,18 +95,60 @@ STRUTTURA JSON DA RISPETTARE PERFETTAMENTE:
   "segmenti": [
     {
       "id": 1,
-      "note": "Eventuali aiuti",
+      "testo_latino": "Miltiades copias eduxit.",
       "difficolta_percentuale": 30,
       "compenso_assegnato": 60,
-      "analisi": {
-        "frase_originale": "Miltiades copias eduxit.",
-        "parole_array": ["Miltiades", "copias", "eduxit", "."],
-        "step1_verbo": { "parola_corretta": "eduxit", "spiegazione_errore": "Cerca il verbo principale" },
-        "step2_analisi_verbo": { "modo": "indicativo", "tempo": "perfetto", "persona": "3", "numero": "singolare", "forma": "attiva" },
-        "step3_soggetto": { "parole_corrette": ["Miltiades"], "sottinteso": false },
-        "step4_nucleo_tradotto": ["Milziade condusse fuori", "Milziade fece uscire"],
-        "step5_complementi": [ { "parole": ["copias"], "caso": "accusativo", "traduzione": "le truppe" }, { "parole": ["."], "caso": "indeclinabile", "traduzione": "." } ]
-      }
+      "proposizioni": [
+        {
+          "id": 1,
+          "testo_proposizione": "Miltiades copias eduxit.",
+          "tipo_proposizione": "principale",
+          "parole_array": ["Miltiades", "copias", "eduxit", "."],
+          "step1_verbo": { "parola_corretta": "eduxit", "spiegazione_errore": "Cerca il verbo principale" },
+          "step2_analisi_verbo": { "modo": "indicativo", "tempo": "perfetto", "persona": "3", "numero": "singolare", "forma": "attiva" },
+          "step3_soggetto": { "parole_corrette": ["Miltiades"], "sottinteso": false },
+          "step4_nucleo_tradotto": ["Milziade condusse fuori", "Milziade fece uscire"],
+          "step5_complementi": [
+            { "parole": ["copias"], "caso": "accusativo", "traduzione": "le truppe" },
+            { "parole": ["."], "caso": "indeclinabile", "traduzione": "." }
+          ]
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "testo_latino": "Cum hostes advenissent, cives timuerunt.",
+      "difficolta_percentuale": 70,
+      "compenso_assegnato": 140,
+      "proposizioni": [
+        {
+          "id": 1,
+          "testo_proposizione": "Cum hostes advenissent,",
+          "tipo_proposizione": "subordinata",
+          "parole_array": ["Cum", "hostes", "advenissent", ","],
+          "step1_verbo": { "parola_corretta": "advenissent", "spiegazione_errore": "Cerca il verbo della subordinata temporale" },
+          "step2_analisi_verbo": { "modo": "congiuntivo", "tempo": "imperfetto", "persona": "3", "numero": "plurale", "forma": "attiva" },
+          "step3_soggetto": { "parole_corrette": ["hostes"], "sottinteso": false },
+          "step4_nucleo_tradotto": ["Quando i nemici arrivarono"],
+          "step5_complementi": [
+            { "parole": ["Cum"], "caso": "indeclinabile", "traduzione": "Quando" },
+            { "parole": [","], "caso": "indeclinabile", "traduzione": "," }
+          ]
+        },
+        {
+          "id": 2,
+          "testo_proposizione": "cives timuerunt.",
+          "tipo_proposizione": "principale",
+          "parole_array": ["cives", "timuerunt", "."],
+          "step1_verbo": { "parola_corretta": "timuerunt", "spiegazione_errore": "Cerca il verbo principale" },
+          "step2_analisi_verbo": { "modo": "indicativo", "tempo": "perfetto", "persona": "3", "numero": "plurale", "forma": "attiva" },
+          "step3_soggetto": { "parole_corrette": ["cives"], "sottinteso": false },
+          "step4_nucleo_tradotto": ["i cittadini ebbero paura"],
+          "step5_complementi": [
+            { "parole": ["."], "caso": "indeclinabile", "traduzione": "." }
+          ]
+        }
+      ]
     }
   ]
 }`

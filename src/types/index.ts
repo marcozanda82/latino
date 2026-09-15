@@ -58,6 +58,8 @@ export interface DropZoneConfig {
 
 export type {
   ExerciseType,
+  Proposizione,
+  ProposizioneTipo,
   VersionExercise,
   VersionSegment,
   VersionProgress,

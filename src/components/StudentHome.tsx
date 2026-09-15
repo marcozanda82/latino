@@ -31,6 +31,8 @@ import {
   getSubmittedLevelIds,
 } from '../utils/studentEvaluations'
 import { useStudentBalance } from '../hooks/useStudentBalance'
+import { SHOW_GAMIFICATION, IS_DEMO_MODE } from '../config/features'
+import { useDemoMode } from '../context/DemoModeContext'
 import { RewardsShop } from './RewardsShop'
 import { StudentBankStatement } from './StudentBankStatement'
 import { StudentArchive } from './StudentArchive'
@@ -49,6 +51,7 @@ const HIDDEN_ACTION_RESET_MS = 2000
 
 export function StudentHome() {
   const navigate = useNavigate()
+  const { setDemoRole } = useDemoMode()
   const { levels, loading } = useExercises()
   const [weeklyCount, setWeeklyCount] = useState(0)
   const [settings, setSettings] = useState<GamificationSettings>(
@@ -59,6 +62,21 @@ export function StudentHome() {
   const [evaluations, setEvaluations] = useState<PendingTranslation[]>([])
   const [activeTab, setActiveTab] = useState<StudentTab>('livelli')
   const { balance } = useStudentBalance()
+
+  const visibleTabs = useMemo(
+    () =>
+      (['livelli', 'negozio', 'estratti', 'archivio'] as StudentTab[]).filter(
+        (tab) =>
+          SHOW_GAMIFICATION || (tab !== 'negozio' && tab !== 'estratti'),
+      ),
+    [],
+  )
+
+  useEffect(() => {
+    if (!visibleTabs.includes(activeTab)) {
+      setActiveTab('livelli')
+    }
+  }, [activeTab, visibleTabs])
 
   const submittedLevelIds = useMemo(
     () => getSubmittedLevelIds(evaluations, levels),
@@ -119,6 +137,9 @@ export function StudentHome() {
 
   const handlePinSuccess = () => {
     setShowPinModal(false)
+    if (IS_DEMO_MODE) {
+      setDemoRole('tutor')
+    }
     navigate('/admin')
   }
 
@@ -143,13 +164,20 @@ export function StudentHome() {
         </h1>
       </button>
       <p className="mt-2 text-sm leading-relaxed text-slate-600">
-        Completa gli esercizi disponibili, guadagna Sesterzi e consulta
-        l&apos;archivio per ripassare quelli già inviati.
+        {SHOW_GAMIFICATION
+          ? "Completa gli esercizi disponibili, guadagna Sesterzi e consulta l'archivio per ripassare quelli già inviati."
+          : 'Completa gli esercizi disponibili e consulta l\'archivio per ripassare quelli già inviati.'}
       </p>
-      <p className="mt-4 inline-flex items-center gap-2 rounded-full border border-amber-200/80 bg-amber-50/90 px-4 py-2 text-sm font-semibold tabular-nums text-amber-900">
-        <span aria-hidden>🪙</span>
-        {balance.toLocaleString('it-IT')} Sesterzi
-      </p>
+      {SHOW_GAMIFICATION ? (
+        <p className="mt-4 inline-flex items-center gap-2 rounded-full border border-amber-200/80 bg-amber-50/90 px-4 py-2 text-sm font-semibold tabular-nums text-amber-900">
+          <span aria-hidden>🪙</span>
+          {balance.toLocaleString('it-IT')} Sesterzi
+        </p>
+      ) : (
+        <p className="mt-4 text-sm font-medium tabular-nums text-slate-700">
+          Punteggio totale: {balance.toLocaleString('it-IT')}
+        </p>
+      )}
     </div>
   )
 
@@ -157,7 +185,7 @@ export function StudentHome() {
     <AppLayout header={header}>
       <GlassCard className="mb-8 !p-2">
         <div className="flex flex-wrap gap-2">
-          {(['livelli', 'negozio', 'estratti', 'archivio'] as StudentTab[]).map((tab) => (
+          {visibleTabs.map((tab) => (
             <button
               key={tab}
               type="button"
@@ -175,15 +203,15 @@ export function StudentHome() {
         </div>
       </GlassCard>
 
-      {activeTab === 'negozio' ? (
+      {activeTab === 'negozio' && SHOW_GAMIFICATION ? (
         <RewardsShop balance={balance} />
-      ) : activeTab === 'estratti' ? (
+      ) : activeTab === 'estratti' && SHOW_GAMIFICATION ? (
         <StudentBankStatement />
       ) : activeTab === 'archivio' ? (
         <StudentArchive />
       ) : (
         <>
-          {!loading && (
+          {!loading && SHOW_GAMIFICATION && (
             <WeeklyGoalTracker completedCount={weeklyCount} settings={settings} />
           )}
 

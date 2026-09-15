@@ -2,6 +2,7 @@ import { AnimatePresence } from 'framer-motion'
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { Toaster } from 'sonner'
 import { ExerciseProvider } from './context/ExerciseContext'
+import { DemoModeProvider } from './context/DemoModeContext'
 import { AdminDashboard } from './components/AdminDashboard'
 import Diagnostic from './components/Diagnostic'
 import { PageTransition } from './components/layout/PageTransition'
@@ -66,21 +67,23 @@ function App() {
         <Route
           path="*"
           element={
-            <ExerciseProvider>
-              <AnimatedRoutes />
-              <Toaster
-                position="top-right"
-                richColors
-                closeButton
-                toastOptions={{
-                  classNames: {
-                    toast: 'font-sans shadow-lift border border-slate-200/80',
-                    title: 'text-slate-800 font-medium',
-                    description: 'text-slate-600',
-                  },
-                }}
-              />
-            </ExerciseProvider>
+            <DemoModeProvider>
+              <ExerciseProvider>
+                <AnimatedRoutes />
+                <Toaster
+                  position="top-right"
+                  richColors
+                  closeButton
+                  toastOptions={{
+                    classNames: {
+                      toast: 'font-sans shadow-lift border border-slate-200/80',
+                      title: 'text-slate-800 font-medium',
+                      description: 'text-slate-600',
+                    },
+                  }}
+                />
+              </ExerciseProvider>
+            </DemoModeProvider>
           }
         />
       </Routes>

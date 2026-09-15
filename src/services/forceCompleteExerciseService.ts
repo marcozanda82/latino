@@ -21,6 +21,7 @@ import {
 } from './firebaseEvaluations'
 import { getStudentUserId } from './studentService'
 import { buildFullTranslation } from '../utils/complements'
+import { buildVersionSegmentFullTranslation } from '../utils/proposizione'
 import {
   finalizeVersionProgress,
   getVersionProgress,
@@ -227,7 +228,7 @@ export async function forceCompleteExercise(
         traduzioneSegmento,
         mechanicalScore: segmentProgress?.mechanicalScore ?? 0,
         compensoAssegnato: segment.compenso_assegnato,
-        traduzioneAttesa: buildFullTranslation(segment.analisi),
+        traduzioneAttesa: buildVersionSegmentFullTranslation(segment),
         stepAnswers: segmentProgress?.stepAnswers,
       }
     })

@@ -27,11 +27,14 @@ import { TutorTransactionsManager } from './TutorTransactionsManager'
 import { VERSION_AI_PROMPT, SENTENCE_AI_PROMPT } from '../constants/aiPrompt'
 import type { LatinAnalysis } from '../types'
 import type { VersionExercise } from '../types/version'
+import { getVersionSegmentLatinText } from '../types/version'
 import {
   parseVersionExerciseJson,
   normalizeVersionExerciseCompensi,
   VersionJsonLoadError,
 } from '../utils/validateVersionExercise'
+import { SHOW_GAMIFICATION, IS_DEMO_MODE } from '../config/features'
+import { useDemoMode } from '../context/DemoModeContext'
 
 type AdminTab = 'esercizi' | 'obiettivi' | 'valutazioni' | 'economia'
 type CreateContentType = 'sentence' | 'version'
@@ -56,6 +59,7 @@ const VERSION_JSON_PLACEHOLDER = `{
 
 export function AdminDashboard() {
   const navigate = useNavigate()
+  const { setDemoRole } = useDemoMode()
   const { levels, loading, saving, addLevel, addVersionLevel, removeLevel, refreshLevels } =
     useExercises()
   const [compDrafts, setCompDrafts] = useState<
@@ -115,6 +119,21 @@ export function AdminDashboard() {
       .then(setSettings)
       .finally(() => setSettingsLoading(false))
   }, [])
+
+  const visibleAdminTabs = useMemo(
+    () =>
+      (['esercizi', 'obiettivi', 'valutazioni', 'economia'] as AdminTab[]).filter(
+        (tab) =>
+          SHOW_GAMIFICATION || (tab !== 'obiettivi' && tab !== 'economia'),
+      ),
+    [],
+  )
+
+  useEffect(() => {
+    if (!visibleAdminTabs.includes(activeTab)) {
+      setActiveTab('esercizi')
+    }
+  }, [activeTab, visibleAdminTabs])
 
   useEffect(() => {
     setCompDrafts(
@@ -335,7 +354,11 @@ export function AdminDashboard() {
   }
 
   const handleExitToStudent = () => {
-    clearTutorAuthentication()
+    if (IS_DEMO_MODE) {
+      setDemoRole('student')
+    } else {
+      clearTutorAuthentication()
+    }
     navigate('/')
   }
 
@@ -350,22 +373,25 @@ export function AdminDashboard() {
             Plancia di comando
           </h1>
           <p className="mt-2 text-sm leading-relaxed text-slate-600">
-            Gestisci esercizi, premi shop, obiettivi settimanali, valutazioni ed
-            economia studente.
+            {SHOW_GAMIFICATION
+              ? 'Gestisci esercizi, premi shop, obiettivi settimanali, valutazioni ed economia studente.'
+              : 'Gestisci esercizi e valutazioni degli studenti.'}
           </p>
-          <button
-            type="button"
-            onClick={handleExitToStudent}
-            className="mt-5 w-full rounded-xl border border-slate-300 bg-white/80 px-6 py-3 text-sm font-semibold text-slate-800 shadow-sm transition-colors hover:bg-slate-50 sm:w-auto"
-          >
-            Esci e torna alla Modalità Studente
-          </button>
+          {!IS_DEMO_MODE && (
+            <button
+              type="button"
+              onClick={handleExitToStudent}
+              className="mt-5 w-full rounded-xl border border-slate-300 bg-white/80 px-6 py-3 text-sm font-semibold text-slate-800 shadow-sm transition-colors hover:bg-slate-50 sm:w-auto"
+            >
+              Esci e torna alla Modalità Studente
+            </button>
+          )}
         </div>
       }
     >
       <GlassCard className="mb-8 !p-2">
         <div className="flex flex-wrap gap-2">
-          {(['esercizi', 'obiettivi', 'valutazioni', 'economia'] as AdminTab[]).map((tab) => (
+          {visibleAdminTabs.map((tab) => (
             <button
               key={tab}
               type="button"
@@ -711,7 +737,7 @@ export function AdminDashboard() {
                         key={segment.id}
                         className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 font-serif text-sm text-slate-700"
                       >
-                        {segment.analisi.frase_originale}
+                        {getVersionSegmentLatinText(segment)}
                       </li>
                     ))}
                     {pendingVersion.segmenti.length > 3 ? (

@@ -1,8 +1,29 @@
-import type { LatinAnalysis } from './index'
+import type {
+  Complemento,
+  Step1Verbo,
+  Step2AnalisiVerbo,
+  Step3Soggetto,
+  TranslationValue,
+} from './index'
 import type { ExerciseDraftData } from './exerciseDraft'
 import type { VerbCategory } from '../utils/verbAnalysis'
 
 export type ExerciseType = 'sentence' | 'version'
+
+export type ProposizioneTipo = 'principale' | 'coordinata' | 'subordinata'
+
+/** Analisi logica a 5 step di una singola proposizione (versioni). */
+export interface Proposizione {
+  id: string | number
+  testo_proposizione: string
+  tipo_proposizione: ProposizioneTipo
+  parole_array: string[]
+  step1_verbo: Step1Verbo
+  step2_analisi_verbo: Step2AnalisiVerbo
+  step3_soggetto: Step3Soggetto
+  step4_nucleo_tradotto: TranslationValue
+  step5_complementi: Complemento[]
+}
 
 export type VersionSegmentProgressStatus =
   | 'locked'
@@ -60,8 +81,8 @@ export interface VersionSegment {
   difficolta_percentuale?: number
   /** Sesterzi assegnati a questo segmento in base alla difficoltà */
   compenso_assegnato?: number
-  /** Analisi logica a 5 step — stesso schema delle Frasi Singole. */
-  analisi: LatinAnalysis
+  /** Analisi del periodo: una o più proposizioni con schema a 5 step ciascuna. */
+  proposizioni: Proposizione[]
 }
 
 /** Payload JSON di una Versione latina. */
@@ -97,11 +118,63 @@ export interface VersionProgress {
 }
 
 export function getVersionSegmentLatinText(segment: VersionSegment): string {
-  return segment.analisi.frase_originale
+  return segment.proposizioni
+    .map((proposizione) => proposizione.testo_proposizione.trim())
+    .filter(Boolean)
+    .join(' ')
+    .replace(/\s+/g, ' ')
+    .trim()
 }
 
 function isOptionalNumber(value: unknown): boolean {
   return value === undefined || (typeof value === 'number' && Number.isFinite(value))
+}
+
+function isProposizioneTipo(value: unknown): value is ProposizioneTipo {
+  return (
+    value === 'principale' ||
+    value === 'coordinata' ||
+    value === 'subordinata'
+  )
+}
+
+function isProposizioneShape(value: unknown): value is Proposizione {
+  if (!value || typeof value !== 'object') return false
+
+  const item = value as Record<string, unknown>
+  const step1 = item.step1_verbo as Record<string, unknown> | undefined
+  const step2 = item.step2_analisi_verbo as Record<string, unknown> | undefined
+  const step3 = item.step3_soggetto as Record<string, unknown> | undefined
+
+  return (
+    (typeof item.id === 'string' || typeof item.id === 'number') &&
+    typeof item.testo_proposizione === 'string' &&
+    item.testo_proposizione.trim().length > 0 &&
+    isProposizioneTipo(item.tipo_proposizione) &&
+    Array.isArray(item.parole_array) &&
+    item.parole_array.every((word) => typeof word === 'string') &&
+    typeof step1 === 'object' &&
+    step1 !== null &&
+    typeof step1.parola_corretta === 'string' &&
+    typeof step1.spiegazione_errore === 'string' &&
+    typeof step2 === 'object' &&
+    step2 !== null &&
+    typeof step2.modo === 'string' &&
+    typeof step2.tempo === 'string' &&
+    typeof step2.forma === 'string' &&
+    typeof step3 === 'object' &&
+    step3 !== null &&
+    Array.isArray(step3.parole_corrette) &&
+    step3.parole_corrette.every((word) => typeof word === 'string') &&
+    typeof step3.sottinteso === 'boolean' &&
+    (typeof item.step4_nucleo_tradotto === 'string' ||
+      (Array.isArray(item.step4_nucleo_tradotto) &&
+        item.step4_nucleo_tradotto.length > 0 &&
+        item.step4_nucleo_tradotto.every(
+          (translation) => typeof translation === 'string',
+        ))) &&
+    Array.isArray(item.step5_complementi)
+  )
 }
 
 function isVersionSegmentShape(value: unknown): value is VersionSegment {
@@ -112,8 +185,9 @@ function isVersionSegmentShape(value: unknown): value is VersionSegment {
     (item.note === undefined || typeof item.note === 'string') &&
     isOptionalNumber(item.difficolta_percentuale) &&
     isOptionalNumber(item.compenso_assegnato) &&
-    typeof item.analisi === 'object' &&
-    item.analisi !== null
+    Array.isArray(item.proposizioni) &&
+    item.proposizioni.length > 0 &&
+    item.proposizioni.every(isProposizioneShape)
   )
 }
 
