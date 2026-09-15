@@ -1,10 +1,26 @@
 import { useNavigate, useLocation } from 'react-router-dom'
+import { BookOpen, LayoutDashboard } from 'lucide-react'
 import { IS_DEMO_MODE } from '../config/features'
 import { useDemoMode, type DemoRole } from '../context/DemoModeContext'
 
-const ROLE_OPTIONS: { value: DemoRole; label: string }[] = [
-  { value: 'student', label: 'Studente' },
-  { value: 'tutor', label: 'Tutor' },
+const ROLE_OPTIONS: {
+  value: DemoRole
+  label: string
+  shortLabel: string
+  Icon: typeof BookOpen
+}[] = [
+  {
+    value: 'student',
+    label: 'Area Studente',
+    shortLabel: 'Studente',
+    Icon: BookOpen,
+  },
+  {
+    value: 'tutor',
+    label: 'Pannello Docente',
+    shortLabel: 'Docente',
+    Icon: LayoutDashboard,
+  },
 ]
 
 export function DemoRoleSwitcher() {
@@ -30,17 +46,18 @@ export function DemoRoleSwitcher() {
   }
 
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3">
-      <p className="text-xs font-semibold uppercase tracking-widest text-amber-900">
-        Modalità demo
+    <div className="flex w-full flex-wrap items-center justify-end gap-3 sm:justify-between">
+      <p className="hidden text-xs font-medium text-slate-500 sm:block">
+        Visualizzazione
       </p>
       <div
-        className="inline-flex rounded-full border border-amber-300 bg-white p-1 shadow-sm"
+        className="inline-flex rounded-xl border border-slate-200/90 bg-white p-1 shadow-sm"
         role="group"
-        aria-label="Vista demo"
+        aria-label="Cambia visualizzazione"
       >
         {ROLE_OPTIONS.map((option) => {
           const isActive = demoRole === option.value
+          const Icon = option.Icon
 
           return (
             <button
@@ -49,13 +66,15 @@ export function DemoRoleSwitcher() {
               aria-pressed={isActive}
               onClick={() => handleSelect(option.value)}
               className={[
-                'rounded-full px-4 py-1.5 text-xs font-semibold transition-colors',
+                'inline-flex min-h-9 items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold transition-all sm:px-4 sm:text-sm',
                 isActive
-                  ? 'bg-amber-600 text-white shadow-sm'
-                  : 'text-amber-900 can-hover:hover:bg-amber-50',
+                  ? 'bg-slate-800 text-white shadow-sm'
+                  : 'text-slate-600 can-hover:hover:bg-slate-50 can-hover:hover:text-slate-800',
               ].join(' ')}
             >
-              {option.label}
+              <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
+              <span className="sm:hidden">{option.shortLabel}</span>
+              <span className="hidden sm:inline">{option.label}</span>
             </button>
           )
         })}
