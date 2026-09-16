@@ -66,7 +66,9 @@ export function AdminDashboard() {
     Record<string, { coefficient: string; customMaxReward: string }>
   >({})
   const [savingCompId, setSavingCompId] = useState<string | null>(null)
-  const [activeTab, setActiveTab] = useState<AdminTab>('esercizi')
+  const [activeTab, setActiveTab] = useState<AdminTab>(
+    IS_DEMO_MODE ? 'economia' : 'esercizi',
+  )
   const [createType, setCreateType] = useState<CreateContentType>('sentence')
   const [pendingAnalysis, setPendingAnalysis] = useState<LatinAnalysis | null>(
     null,
@@ -124,7 +126,10 @@ export function AdminDashboard() {
     () =>
       (['esercizi', 'obiettivi', 'valutazioni', 'economia'] as AdminTab[]).filter(
         (tab) => {
-          if (tab === 'obiettivi' || tab === 'economia') {
+          if (tab === 'obiettivi') {
+            return SHOW_GAMIFICATION
+          }
+          if (tab === 'economia') {
             return SHOW_GAMIFICATION || IS_DEMO_MODE
           }
           return true
@@ -135,7 +140,11 @@ export function AdminDashboard() {
 
   useEffect(() => {
     if (!visibleAdminTabs.includes(activeTab)) {
-      setActiveTab('esercizi')
+      setActiveTab(
+        IS_DEMO_MODE && visibleAdminTabs.includes('economia')
+          ? 'economia'
+          : 'esercizi',
+      )
     }
   }, [activeTab, visibleAdminTabs])
 
@@ -379,7 +388,9 @@ export function AdminDashboard() {
           <p className="mt-2 text-sm leading-relaxed text-slate-600">
             {SHOW_GAMIFICATION
               ? 'Gestisci esercizi, premi shop, obiettivi settimanali, valutazioni ed economia studente.'
-              : 'Gestisci esercizi e valutazioni degli studenti.'}
+              : IS_DEMO_MODE
+                ? 'Gestisci esercizi, valutazioni e registro voti degli studenti.'
+                : 'Gestisci esercizi e valutazioni degli studenti.'}
           </p>
           {!IS_DEMO_MODE && (
             <button
