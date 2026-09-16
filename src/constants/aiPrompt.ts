@@ -20,7 +20,7 @@ Regole rigorose per l'analisi:
 - \`step2_analisi_verbo.forma\`: Solo [attiva, passiva].
 - \`step2_analisi_verbo.tempo\`: Usa le diciture standard esatte (es. "presente", "imperfetto", "futuro semplice", "perfetto", "piuccheperfetto", "futuro anteriore").
 - \`step3_soggetto.parole_corrette\`: Le parole del soggetto (se sottinteso, array vuoto e \`sottinteso: true\`).
-- \`step4_nucleo_tradotto\`: Traduzione del verbo + soggetto in italiano (accetta stringa o array di varianti).
+- \`step4_nucleo_tradotto\`: Traduzione IN ITALIANO ESCLUSIVAMENTE delle parole contenute in \`step1_verbo\` e \`step3_soggetto\`. ATTENZIONE CRITICA (DIVIETO DI SPOILER): Non tradurre assolutamente le congiunzioni (come cum, dum, simul atque, et, sed) né alcun avverbio o complemento. Se la frase è 'simul atque imperium obtinuerat', il nucleo deve essere SOLO ['aveva ottenuto'] oppure ['egli aveva ottenuto']. Se includi altre parole, rovini l'esercizio allo studente. (Accetta stringa o array di varianti equivalenti.)
 - \`step5_complementi\`: Array di oggetti. I complementi devono coprire ESATTAMENTE tutte e sole le parole di \`parole_array\` che non fanno parte del verbo o del soggetto. \`caso\` deve essere uno tra [genitivo, dativo, accusativo, vocativo, ablativo, locativo, indeclinabile, congiunzione, subordinata].
 - VERIFICA FINALE: La somma delle parole usate in step 1, step 3 e step 5 deve ricostruire l'intero \`parole_array\`.
 
@@ -78,7 +78,7 @@ REGOLE PER LE PROPOSIZIONI E ANALISI:
    - \`step1_verbo\`: { parola_corretta, spiegazione_errore }
    - \`step2_analisi_verbo\`: { modo, forma, tempo, persona, numero } (se indefinito, ometti persona e numero).
    - \`step3_soggetto\`: { parole_corrette, sottinteso: booleano }
-   - \`step4_nucleo_tradotto\`: array di stringhe
+   - \`step4_nucleo_tradotto\`: Traduzione IN ITALIANO ESCLUSIVAMENTE delle parole contenute in \`step1_verbo\` e \`step3_soggetto\`. ATTENZIONE CRITICA (DIVIETO DI SPOILER): Non tradurre assolutamente le congiunzioni (come cum, dum, simul atque, et, sed) né alcun avverbio o complemento. Se la frase è 'simul atque imperium obtinuerat', il nucleo deve essere SOLO ['aveva ottenuto'] oppure ['egli aveva ottenuto']. Se includi altre parole, rovini l'esercizio allo studente. (Array di stringhe con varianti equivalenti.)
    - \`step5_complementi\`: array di { parole, caso, traduzione }. Il caso deve essere uno tra [genitivo, dativo, accusativo, vocativo, ablativo, locativo, indeclinabile, congiunzione].
    - IMPORTANTE: nello step 5 non devi più usare 'subordinata' come caso, perché la natura della frase è già definita in \`tipo_proposizione\`.
 
@@ -137,7 +137,7 @@ ESEMPIO JSON (schema da rispettare):
           "step1_verbo": { "parola_corretta": "advenissent", "spiegazione_errore": "Cerca il verbo della subordinata temporale" },
           "step2_analisi_verbo": { "modo": "congiuntivo", "tempo": "imperfetto", "persona": "3", "numero": "plurale", "forma": "attiva" },
           "step3_soggetto": { "parole_corrette": ["hostes"], "sottinteso": false },
-          "step4_nucleo_tradotto": ["Quando i nemici arrivarono"],
+          "step4_nucleo_tradotto": ["i nemici arrivarono", "arrivarono i nemici"],
           "step5_complementi": [
             { "parole": ["Cum"], "caso": "indeclinabile", "traduzione": "Quando" },
             { "parole": [","], "caso": "indeclinabile", "traduzione": "," }
