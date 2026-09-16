@@ -81,9 +81,17 @@ REGOLE PER LE PROPOSIZIONI E ANALISI:
    - \`step4_nucleo_tradotto\`: array di stringhe
    - \`step5_complementi\`: array di { parole, caso, traduzione }. Il caso deve essere uno tra [genitivo, dativo, accusativo, vocativo, ablativo, locativo, indeclinabile, congiunzione].
    - IMPORTANTE: nello step 5 non devi più usare 'subordinata' come caso, perché la natura della frase è già definita in \`tipo_proposizione\`.
+
+REGOLA DI VALIDAZIONE CRITICA (ZERO OMISSIONI):
+È assolutamente vitale che OGNI SINGOLA PAROLA presente in \`parole_array\` (inclusa la punteggiatura) venga smistata in uno dei 3 step logici (Verbo, Soggetto o Complementi).
+Prima di generare l'output JSON, esegui mentalmente questa somma:
+(parole in step1_verbo) + (parole in step3_soggetto) + (tutte le parole negli oggetti di step5_complementi) DEVE ESSERE UGUALE AL 100% all'array iniziale \`parole_array\`.
+Non tralasciare MAI preposizioni, nomi propri (es. 'in Asiam') o punteggiatura. Se una parola non è verbo o soggetto, DEVE finire nei complementi.
+Per \`step1_verbo.parola_corretta\`: se il verbo è composto (es. "erant missi"), conta tutte le sue forme come parole del verbo. Ogni elemento di \`parole_array\` deve comparire esattamente una volta nella ripartizione totale.
+
 4. \`step1_verbo.parola_corretta\` deve essere identica a uno o più elementi consecutivi di \`parole_array\`. Se è un verbo composto (es. "celebratae erunt"), inserisci entrambi i termini esatti.
 5. \`step2_analisi_verbo.modo\`: Solo [indicativo, imperativo, infinito, participio, congiuntivo]. \`forma\`: Solo [attiva, passiva]. \`tempo\`: diciture standard esatte (es. "presente", "imperfetto", "futuro semplice", "perfetto", "piuccheperfetto", "futuro anteriore").
-6. VERIFICA FINALE (per ogni proposizione): la somma delle parole usate in step 1, step 3 e step 5 deve ricostruire l'intero \`parole_array\` della proposizione.
+6. VERIFICA FINALE OBBLIGATORIA (per ogni proposizione): ricontrolla la REGOLA DI VALIDAZIONE CRITICA sopra. Se manca anche una sola parola di \`parole_array\`, correggi \`step5_complementi\` (o verbo/soggetto) prima di consegnare il JSON.
 7. Non includere il campo \`coefficiente\` nei segmenti versione.
 
 ESEMPIO JSON (schema da rispettare):

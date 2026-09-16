@@ -1,16 +1,17 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
+import { Mic, MicOff } from 'lucide-react'
 import { Step1VerbSelection } from '../steps/Step1VerbSelection'
 import { Step2VerbAnalysis } from '../steps/Step2VerbAnalysis'
 import { Step3SubjectSelection } from '../steps/Step3SubjectSelection'
 import { Step4CoreTranslation } from '../steps/Step4CoreTranslation'
 import { Step5Satellites } from '../steps/Step5Satellites'
 import { showError } from '../../lib/toast'
+import { useSpeechToText } from '../../hooks/useSpeechToText'
 import type { Proposizione } from '../../types/version'
 import { proposizioneToLatinAnalysis } from '../../utils/proposizione'
 import type { VerbCategory } from '../../utils/verbAnalysis'
 import type { LatinCase } from '../../utils/caseAnalysis'
-import { buildFullTranslation } from '../../utils/complements'
 
 type MicroStep = 1 | 2 | 3 | 4 | 5
 
@@ -28,7 +29,10 @@ const MECHANICAL_PENALTY = 2
 export interface ProposizioneMicroResult {
   proposizioneId: string | number
   mechanicalScore: number
+  /** Assemblaggio grezzo da nucleo + complementi. */
   studentFullTranslation: string
+  /** Traduzione libera confermata dallo studente. */
+  traduzioneLibera: string
   studentCoreTranslation: string
   studentComplementTranslations: string[]
   step1PlacedTileId: string | null
@@ -63,6 +67,8 @@ export function ProposizioneMicroFlow({
   const [step3Complete, setStep3Complete] = useState(false)
   const [step4Complete, setStep4Complete] = useState(false)
   const [step5Complete, setStep5Complete] = useState(false)
+  const [analysisComplete, setAnalysisComplete] = useState(false)
+  const [freeTranslation, setFreeTranslation] = useState('')
   const [mechanicalScore, setMechanicalScore] = useState(MECHANICAL_SCORE_INITIAL)
   const [studentCoreTranslation, setStudentCoreTranslation] = useState('')
   const [studentComplementTranslations, setStudentComplementTranslations] =
@@ -93,6 +99,15 @@ export function ProposizioneMicroFlow({
     caseLocked: false,
     selectedCase: null as LatinCase | null,
   })
+  const speechBaseRef = useRef('')
+
+  const {
+    isListening,
+    transcript,
+    startListening,
+    stopListening,
+    isSupported,
+  } = useSpeechToText()
 
   const handleMistake = useCallback(() => {
     setMechanicalScore((prev) => Math.max(0, prev - MECHANICAL_PENALTY))
@@ -115,32 +130,60 @@ export function ProposizioneMicroFlow({
     [studentCoreTranslation, studentComplementTranslations],
   )
 
-  const buildResult = useCallback((): ProposizioneMicroResult => ({
-    proposizioneId: proposizione.id,
-    mechanicalScore,
-    studentFullTranslation,
-    studentCoreTranslation,
-    studentComplementTranslations,
-    step1PlacedTileId: step1Snapshot.placedTileId,
-    step2SelectedAnswers: step2Snapshot.selectedAnswers,
-    step3PlacedTileIds: step3Snapshot.placedTileIds,
-    step3ImplicitSuccess: step3Snapshot.implicitSuccess,
-  }), [
-    mechanicalScore,
-    proposizione.id,
-    step1Snapshot.placedTileId,
-    step2Snapshot.selectedAnswers,
-    step3Snapshot.implicitSuccess,
-    step3Snapshot.placedTileIds,
-    studentComplementTranslations,
-    studentCoreTranslation,
-    studentFullTranslation,
-  ])
+  useEffect(() => {
+    if (!transcript.trim()) return
+
+    const base = speechBaseRef.current.trim()
+    const spoken = transcript.trim()
+    setFreeTranslation(base ? `${base} ${spoken}` : spoken)
+  }, [transcript])
+
+  const buildResult = useCallback(
+    (traduzioneLibera: string): ProposizioneMicroResult => ({
+      proposizioneId: proposizione.id,
+      mechanicalScore,
+      studentFullTranslation,
+      traduzioneLibera: traduzioneLibera.trim(),
+      studentCoreTranslation,
+      studentComplementTranslations,
+      step1PlacedTileId: step1Snapshot.placedTileId,
+      step2SelectedAnswers: step2Snapshot.selectedAnswers,
+      step3PlacedTileIds: step3Snapshot.placedTileIds,
+      step3ImplicitSuccess: step3Snapshot.implicitSuccess,
+    }),
+    [
+      mechanicalScore,
+      proposizione.id,
+      step1Snapshot.placedTileId,
+      step2Snapshot.selectedAnswers,
+      step3Snapshot.implicitSuccess,
+      step3Snapshot.placedTileIds,
+      studentComplementTranslations,
+      studentCoreTranslation,
+      studentFullTranslation,
+    ],
+  )
 
   const handleStep5Complete = useCallback(() => {
     setStep5Complete(true)
-    onComplete(buildResult())
-  }, [buildResult, onComplete])
+    setAnalysisComplete(true)
+  }, [])
+
+  const handleMicToggle = () => {
+    if (isListening) {
+      stopListening()
+      return
+    }
+
+    speechBaseRef.current = freeTranslation
+    startListening()
+  }
+
+  const handleConfirmFreeTranslation = () => {
+    if (!freeTranslation.trim()) return
+    stopListening()
+    onComplete(buildResult(freeTranslation))
+  }
 
   const handleAvanti = () => {
     if (currentStep === 1 && step1Complete) setCurrentStep(2)
@@ -159,10 +202,10 @@ export function ProposizioneMicroFlow({
     return (
       <div className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50/80 px-4 py-3">
         <p className="text-xs font-semibold uppercase tracking-widest text-emerald-600">
-          Analisi completata
+          Proposizione completata
         </p>
         <p className="mt-2 text-sm text-slate-700">
-          {completedResult.studentFullTranslation}
+          {completedResult.traduzioneLibera}
         </p>
         <p className="mt-1 text-xs text-slate-500">
           Punteggio meccanico: {completedResult.mechanicalScore}/60
@@ -176,6 +219,92 @@ export function ProposizioneMicroFlow({
       <p className="mt-4 text-sm italic text-slate-400">
         Completa prima l&apos;analisi delle proposizioni precedenti.
       </p>
+    )
+  }
+
+  if (analysisComplete) {
+    return (
+      <div className="mt-4 space-y-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+        <div className="rounded-lg border border-slate-100 bg-slate-50 px-4 py-3">
+          <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">
+            Pezzi tradotti (bozza)
+          </p>
+          <p className="mt-2 text-sm italic text-slate-600">
+            {studentFullTranslation || '—'}
+          </p>
+        </div>
+
+        <section>
+          <h4 className="text-sm font-semibold text-slate-800">
+            Traduzione finale proposizione
+          </h4>
+          <p className="mt-1 text-sm text-slate-500">
+            Riscrivi la proposizione in un italiano corretto e scorrevole.
+          </p>
+
+          <label
+            htmlFor={`proposizione-free-${proposizione.id}`}
+            className="sr-only"
+          >
+            Traduzione finale proposizione
+          </label>
+          <div className="relative mt-3">
+            <textarea
+              id={`proposizione-free-${proposizione.id}`}
+              rows={3}
+              value={freeTranslation}
+              onChange={(event) => setFreeTranslation(event.target.value)}
+              placeholder="Scrivi la traduzione in italiano…"
+              className={[
+                'w-full resize-y rounded-lg border border-slate-200 bg-white py-3 text-base text-slate-800 shadow-sm outline-none transition-colors placeholder:text-slate-400 focus:border-slate-400',
+                isSupported ? 'pl-4 pr-12' : 'px-4',
+              ].join(' ')}
+            />
+
+            {isSupported && (
+              <motion.button
+                type="button"
+                onClick={handleMicToggle}
+                aria-label={
+                  isListening ? 'Ferma dettatura' : 'Avvia dettatura vocale'
+                }
+                aria-pressed={isListening}
+                animate={
+                  isListening
+                    ? { scale: [1, 1.08, 1], opacity: [1, 0.85, 1] }
+                    : { scale: 1, opacity: 1 }
+                }
+                transition={
+                  isListening
+                    ? { duration: 1.2, repeat: Infinity, ease: 'easeInOut' }
+                    : { duration: 0.2 }
+                }
+                className={[
+                  'absolute right-2 top-3 flex h-9 w-9 items-center justify-center rounded-full border transition-colors',
+                  isListening
+                    ? 'border-red-300 bg-red-50 text-red-600 can-hover:hover:bg-red-100'
+                    : 'border-slate-200 bg-white text-slate-500 can-hover:hover:border-slate-300 can-hover:hover:bg-slate-50 can-hover:hover:text-slate-700',
+                ].join(' ')}
+              >
+                {isListening ? (
+                  <MicOff className="h-4 w-4" aria-hidden="true" />
+                ) : (
+                  <Mic className="h-4 w-4" aria-hidden="true" />
+                )}
+              </motion.button>
+            )}
+          </div>
+
+          <button
+            type="button"
+            onClick={handleConfirmFreeTranslation}
+            disabled={!freeTranslation.trim()}
+            className="mt-4 cursor-pointer rounded-lg bg-slate-800 px-5 py-2.5 text-sm font-medium text-white shadow-sm transition-all can-hover:hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400"
+          >
+            Conferma traduzione
+          </button>
+        </section>
+      </div>
     )
   }
 
@@ -325,12 +454,6 @@ export function ProposizioneMicroFlow({
             Avanti
           </button>
         </div>
-      )}
-
-      {step5Complete && (
-        <p className="mt-3 text-xs text-emerald-700">
-          Traduzione proposizione: {studentFullTranslation || buildFullTranslation(analysis)}
-        </p>
       )}
     </div>
   )

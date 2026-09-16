@@ -69,24 +69,33 @@ export function PeriodAnalysisFlow({
     resolvedIds.has(getProposizioneKey(proposizione)),
   )
 
+  const isProposizioneComplete = useCallback(
+    (key: string) => Boolean(microResults[key]?.traduzioneLibera?.trim()),
+    [microResults],
+  )
+
   const allMicroComplete = segment.proposizioni.every((proposizione) =>
-    Boolean(microResults[getProposizioneKey(proposizione)]),
+    isProposizioneComplete(getProposizioneKey(proposizione)),
   )
 
   const activeMicroKey = useMemo(() => {
     for (const proposizione of segment.proposizioni) {
       const key = getProposizioneKey(proposizione)
-      if (resolvedIds.has(key) && !microResults[key]) {
+      if (resolvedIds.has(key) && !isProposizioneComplete(key)) {
         return key
       }
     }
     return null
-  }, [microResults, resolvedIds, segment.proposizioni])
+  }, [isProposizioneComplete, resolvedIds, segment.proposizioni])
 
   const suggestedFinalTranslation = useMemo(
     () =>
       segment.proposizioni
-        .map((proposizione) => microResults[getProposizioneKey(proposizione)]?.studentFullTranslation ?? '')
+        .map(
+          (proposizione) =>
+            microResults[getProposizioneKey(proposizione)]?.traduzioneLibera ??
+            '',
+        )
         .filter(Boolean)
         .join(' ')
         .replace(/\s+/g, ' ')
@@ -227,7 +236,7 @@ export function PeriodAnalysisFlow({
             {!allClassified
               ? 'Classifica ogni proposizione, poi completa l\'analisi logica a 5 step.'
               : !allMicroComplete
-                ? 'Completa l\'analisi di ogni proposizione in ordine.'
+                ? 'Completa l\'analisi e conferma la traduzione libera di ogni proposizione.'
                 : 'Unisci le traduzioni in una frase fluida per il segmento.'}
           </p>
         </div>
@@ -240,7 +249,7 @@ export function PeriodAnalysisFlow({
           {segment.proposizioni.map((proposizione, index) => {
             const key = getProposizioneKey(proposizione)
             const isResolved = resolvedIds.has(key)
-            const microComplete = Boolean(microResults[key])
+            const microComplete = isProposizioneComplete(key)
             const isActiveMicro = activeMicroKey === key
 
             return (
@@ -252,9 +261,11 @@ export function PeriodAnalysisFlow({
                 transition={{ delay: index * 0.05 }}
                 className={[
                   'rounded-xl border p-5 transition-colors',
-                  isResolved
+                  microComplete
                     ? 'border-emerald-300 bg-emerald-50/40'
-                    : 'border-slate-200 bg-white',
+                    : isResolved
+                      ? 'border-sky-200 bg-sky-50/30'
+                      : 'border-slate-200 bg-white',
                 ].join(' ')}
               >
                 <div className="flex flex-wrap items-start justify-between gap-3">
@@ -266,11 +277,15 @@ export function PeriodAnalysisFlow({
                       {proposizione.testo_proposizione}
                     </p>
                   </div>
-                  {isResolved && (
+                  {microComplete ? (
                     <span className="rounded-full border border-emerald-300 bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-800">
-                      Classificata
+                      Completata
                     </span>
-                  )}
+                  ) : isResolved ? (
+                    <span className="rounded-full border border-sky-200 bg-sky-100 px-3 py-1 text-xs font-semibold text-sky-800">
+                      In analisi
+                    </span>
+                  ) : null}
                 </div>
 
                 <div className="mt-4 flex flex-wrap gap-2">
