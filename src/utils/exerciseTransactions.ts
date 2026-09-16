@@ -8,7 +8,9 @@ import {
   type StudentTransaction,
 } from '../types/transaction'
 import type { PendingTranslation } from '../types/evaluation'
+import { isArchivedEvaluation } from '../types/evaluation'
 import { isSentenceLevel, isVersionLevel } from '../services/exerciseService'
+import { buildEvaluationByLevelId } from './studentEvaluations'
 import { calculateSchoolGrade } from './grades'
 
 const VERSION_REWARD_PREFIX = 'Ricompensa tutor per versione: '
@@ -146,12 +148,37 @@ function resolveLevelForTransaction(
   return undefined
 }
 
+function buildGradeEntryFromEvaluation(
+  evaluation: PendingTranslation,
+  level: Level | undefined,
+): ExerciseGradeEntry | null {
+  const pointsObtained = evaluation.reward ?? 0
+  if (pointsObtained <= 0) return null
+
+  const maxPoints = level
+    ? getMaxPointsForLevel(level)
+    : evaluation.suggestedReward ?? pointsObtained
+
+  return {
+    transactionId: evaluation.id,
+    title:
+      level?.title ??
+      evaluation.titolo ??
+      evaluation.fraseOriginale,
+    timestamp: evaluation.createdAt,
+    pointsObtained,
+    maxPoints,
+    grade: calculateSchoolGrade(pointsObtained, maxPoints),
+    levelId: level?.id ?? evaluation.levelId,
+  }
+}
+
 export function buildExerciseGradeEntries(
   transactions: StudentTransaction[],
   levels: Level[],
   evaluations: PendingTranslation[],
 ): ExerciseGradeEntry[] {
-  return transactions
+  const transactionEntries = transactions
     .filter(isExerciseTransaction)
     .map((tx) => {
       const evaluation = findMatchingEvaluation(tx, evaluations)
@@ -176,4 +203,40 @@ export function buildExerciseGradeEntries(
         levelId: level?.id ?? evaluation?.levelId,
       }
     })
+
+  const coveredLevelIds = new Set(
+    transactionEntries
+      .map((entry) => entry.levelId)
+      .filter((levelId): levelId is string => Boolean(levelId)),
+  )
+
+  const completedEvaluations = evaluations.filter(
+    (evaluation) =>
+      isArchivedEvaluation(evaluation.status) ||
+      (typeof evaluation.reward === 'number' && evaluation.reward > 0),
+  )
+
+  const evaluationEntries = Object.entries(
+    buildEvaluationByLevelId(completedEvaluations, levels),
+  ).flatMap(([levelId, evaluation]) => {
+    if (coveredLevelIds.has(levelId)) return []
+    const level = levels.find((item) => item.id === levelId)
+    const entry = buildGradeEntryFromEvaluation(evaluation, level)
+    return entry ? [entry] : []
+  })
+
+  return [...transactionEntries, ...evaluationEntries].sort(
+    (a, b) => getGradeEntryTimestampMs(b) - getGradeEntryTimestampMs(a),
+  )
+}
+
+function getGradeEntryTimestampMs(entry: ExerciseGradeEntry): number {
+  return entry.timestamp?.toDate?.()?.getTime() ?? 0
+}
+
+export function getGradeForLevelId(
+  gradeEntries: ExerciseGradeEntry[],
+  levelId: string,
+): number | undefined {
+  return gradeEntries.find((entry) => entry.levelId === levelId)?.grade
 }

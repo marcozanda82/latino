@@ -4,6 +4,10 @@ import { GlassCard } from './ui/GlassCard'
 import { LevelCardsSkeleton } from './ui/Skeletons'
 import { useExercises } from '../context/ExerciseContext'
 import { subscribeToArchivedEvaluations } from '../services/firebaseEvaluations'
+import { IS_DEMO_MODE } from '../config/features'
+import { useExerciseGradeEntries } from '../hooks/useExerciseGradeEntries'
+import { getGradeForLevelId } from '../utils/exerciseTransactions'
+import { formatAverageSchoolGrade } from '../utils/grades'
 import type { PendingTranslation } from '../types/evaluation'
 import type { LatinAnalysis } from '../types'
 import { VERB_CATEGORY_LABELS } from '../utils/verbAnalysis'
@@ -111,6 +115,7 @@ function AnalysisSummary({ analysis }: { analysis: LatinAnalysis }) {
 
 export function StudentArchive() {
   const { levels } = useExercises()
+  const { gradeEntries } = useExerciseGradeEntries()
   const [items, setItems] = useState<PendingTranslation[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedId, setSelectedId] = useState<string | null>(null)
@@ -203,9 +208,23 @@ export function StudentArchive() {
                         « {item.fraseOriginale} »
                       </p>
                       <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
-                        <span className="rounded-full bg-emerald-100 px-2 py-0.5 font-medium text-emerald-800">
-                          {statusLabel(item.status)}
-                        </span>
+                        {IS_DEMO_MODE && item.levelId ? (
+                          (() => {
+                            const grade = getGradeForLevelId(
+                              gradeEntries,
+                              item.levelId,
+                            )
+                            return typeof grade === 'number' ? (
+                              <span className="rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 font-bold tabular-nums text-sky-800">
+                                Voto: {formatAverageSchoolGrade(grade)}/10
+                              </span>
+                            ) : null
+                          })()
+                        ) : (
+                          <span className="rounded-full bg-emerald-100 px-2 py-0.5 font-medium text-emerald-800">
+                            {statusLabel(item.status)}
+                          </span>
+                        )}
                         <span className="text-slate-500">
                           {formatDate(item.createdAt)}
                         </span>

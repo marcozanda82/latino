@@ -24,3 +24,15 @@ export function formatSchoolGrade(grade: number): string {
     grade % 1 === 0 ? grade.toFixed(0) : grade.toFixed(1)
   return `${formatted} / 10`
 }
+
+export function formatAverageSchoolGrade(grade: number): string {
+  const formatted =
+    grade % 1 === 0 ? grade.toFixed(0) : grade.toFixed(1)
+  return formatted
+}
+
+export function calculateAverageSchoolGrade(grades: number[]): number | null {
+  if (grades.length === 0) return null
+  const sum = grades.reduce((total, grade) => total + grade, 0)
+  return Math.round((sum / grades.length) * 10) / 10
+}

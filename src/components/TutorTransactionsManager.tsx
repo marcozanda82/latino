@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Eye } from 'lucide-react'
 import { GlassCard } from './ui/GlassCard'
@@ -8,47 +8,24 @@ import { showError, showSuccess } from '../lib/toast'
 import { revertTransaction } from '../services/transactionService'
 import { useStudentBalance } from '../hooks/useStudentBalance'
 import { useStudentTransactions } from '../hooks/useStudentTransactions'
-import { useExercises } from '../context/ExerciseContext'
-import { subscribeToArchivedEvaluations } from '../services/firebaseEvaluations'
 import { IS_DEMO_MODE } from '../config/features'
+import { useExerciseGradeEntries } from '../hooks/useExerciseGradeEntries'
 import {
   getTransactionStatusLabel,
   isTransactionReverted,
 } from '../types/transaction'
-import type { PendingTranslation } from '../types/evaluation'
 import {
   formatTransactionAmount,
   formatTransactionTimestamp,
 } from '../utils/transactionDisplay'
-import { buildExerciseGradeEntries } from '../utils/exerciseTransactions'
 import { formatSchoolGrade } from '../utils/grades'
 
 export function TutorTransactionsManager() {
   const { balance } = useStudentBalance()
   const { transactions, loading, error } = useStudentTransactions()
-  const { levels } = useExercises()
+  const { gradeEntries, averageGrade } = useExerciseGradeEntries()
   const [revertingId, setRevertingId] = useState<string | null>(null)
   const [bonusModalOpen, setBonusModalOpen] = useState(false)
-  const [evaluations, setEvaluations] = useState<PendingTranslation[]>([])
-
-  useEffect(() => {
-    if (!IS_DEMO_MODE) return
-    return subscribeToArchivedEvaluations(setEvaluations)
-  }, [])
-
-  const gradeEntries = useMemo(
-    () =>
-      IS_DEMO_MODE
-        ? buildExerciseGradeEntries(transactions, levels, evaluations)
-        : [],
-    [transactions, levels, evaluations],
-  )
-
-  const averageGrade = useMemo(() => {
-    if (gradeEntries.length === 0) return null
-    const sum = gradeEntries.reduce((total, entry) => total + entry.grade, 0)
-    return Math.round((sum / gradeEntries.length) * 10) / 10
-  }, [gradeEntries])
 
   const handleBonusSuccess = useCallback(() => {
     showSuccess('Sesterzi assegnati con successo!')

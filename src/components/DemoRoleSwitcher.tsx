@@ -17,8 +17,8 @@ const ROLE_OPTIONS: {
   },
   {
     value: 'tutor',
-    label: 'Pannello Docente',
-    shortLabel: 'Docente',
+    label: 'Pannello Tutor',
+    shortLabel: 'Tutor',
     Icon: LayoutDashboard,
   },
 ]
