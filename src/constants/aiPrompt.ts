@@ -43,7 +43,49 @@ STRUTTURA JSON RICHIESTA (Esempio per una frase, ma tu restituisci l'array con t
       { "parole": ["convivae", "quoque", "laeti", "erunt", "."], "caso": "subordinata", "traduzione": "anche i convitati saranno lieti." }
     ]
   }
-]`
+]
+
+=== ESEMPIO DI ANALISI PERFETTA DA EMULARE RIGOROSAMENTE ===
+Frase latina: 'Augustus imperator, vir clarus, Romam venit senatusque eum laudavit.'
+
+ATTENZIONE A COME LA FRASE VIENE DISSEZIONATA:
+- 'Augustus' è il soggetto. 'imperator' e 'vir clarus' sono apposizioni/attributi e VANNO NEI COMPLEMENTI.
+- 'senatusque' contiene la congiunzione enclitica '-que'. Va separata!
+
+[
+  {
+    "frase_originale": "Augustus imperator, vir clarus, Romam venit",
+    "parole_array": ["Augustus", "imperator", ",", "vir", "clarus", ",", "Romam", "venit"],
+    "coefficiente": 2,
+    "step1_verbo": { "parola_corretta": "venit", "spiegazione_errore": "..." },
+    "step2_analisi_verbo": { "modo": "indicativo", "tempo": "perfetto", "persona": "3", "numero": "singolare", "forma": "attiva" },
+    "step3_soggetto": { "parole_corrette": ["Augustus"], "sottinteso": false },
+    "step4_nucleo_tradotto": ["Augusto venne"],
+    "step5_complementi": [
+      { "parole": ["imperator"], "caso": "nominativo", "traduzione": "l'imperatore" },
+      { "parole": [","], "caso": "indeclinabile", "traduzione": "," },
+      { "parole": ["vir", "clarus"], "caso": "nominativo", "traduzione": "uomo illustre" },
+      { "parole": [","], "caso": "indeclinabile", "traduzione": "," },
+      { "parole": ["Romam"], "caso": "accusativo", "traduzione": "a Roma" }
+    ]
+  },
+  {
+    "frase_originale": "senatusque eum laudavit.",
+    "parole_array": ["senatus", "que", "eum", "laudavit", "."],
+    "coefficiente": 2,
+    "step1_verbo": { "parola_corretta": "laudavit", "spiegazione_errore": "..." },
+    "step2_analisi_verbo": { "modo": "indicativo", "tempo": "perfetto", "persona": "3", "numero": "singolare", "forma": "attiva" },
+    "step3_soggetto": { "parole_corrette": ["senatus"], "sottinteso": false },
+    "step4_nucleo_tradotto": ["il senato lodò"],
+    "step5_complementi": [
+      { "parole": ["que"], "caso": "congiunzione", "traduzione": "e" },
+      { "parole": ["eum"], "caso": "accusativo", "traduzione": "lo" },
+      { "parole": ["."], "caso": "indeclinabile", "traduzione": "." }
+    ]
+  }
+]
+======================================================
+DEVI copiare questa ESATTA precisione chirurgica. Nessuna parola aggregata in modo errato.`
 
 /**
  * Prompt da copiare in ChatGPT/Claude insieme all'immagine della versione.
@@ -159,4 +201,46 @@ ESEMPIO JSON (schema da rispettare):
       ]
     }
   ]
-}`
+}
+
+=== ESEMPIO DI ANALISI PERFETTA DA EMULARE RIGOROSAMENTE ===
+Frase latina: 'Augustus imperator, vir clarus, Romam venit senatusque eum laudavit.'
+
+ATTENZIONE A COME LA FRASE VIENE DISSEZIONATA: 
+- 'Augustus' è il soggetto. 'imperator' e 'vir clarus' sono apposizioni/attributi e VANNO NEI COMPLEMENTI.
+- 'senatusque' contiene la congiunzione enclitica '-que'. Va separata!
+
+[
+  {
+    "testo_proposizione": "Augustus imperator, vir clarus, Romam venit",
+    "tipo_proposizione": "principale",
+    "parole_array": ["Augustus", "imperator", ",", "vir", "clarus", ",", "Romam", "venit"],
+    "step1_verbo": { "parola_corretta": "venit", "spiegazione_errore": "..." },
+    "step2_analisi_verbo": { "modo": "indicativo", "tempo": "perfetto", "persona": "3", "numero": "singolare", "forma": "attiva" },
+    "step3_soggetto": { "parole_corrette": ["Augustus"], "sottinteso": false },
+    "step4_nucleo_tradotto": ["Augusto venne"],
+    "step5_complementi": [
+      { "parole": ["imperator"], "caso": "nominativo", "traduzione": "l'imperatore" },
+      { "parole": [","], "caso": "indeclinabile", "traduzione": "," },
+      { "parole": ["vir", "clarus"], "caso": "nominativo", "traduzione": "uomo illustre" },
+      { "parole": [","], "caso": "indeclinabile", "traduzione": "," },
+      { "parole": ["Romam"], "caso": "accusativo", "traduzione": "a Roma" }
+    ]
+  },
+  {
+    "testo_proposizione": "senatusque eum laudavit.",
+    "tipo_proposizione": "coordinata",
+    "parole_array": ["senatusque", "eum", "laudavit", "."],
+    "step1_verbo": { "parola_corretta": "laudavit", "spiegazione_errore": "..." },
+    "step2_analisi_verbo": { "modo": "indicativo", "tempo": "perfetto", "persona": "3", "numero": "singolare", "forma": "attiva" },
+    "step3_soggetto": { "parole_corrette": ["senatus"], "sottinteso": false },
+    "step4_nucleo_tradotto": ["il senato lodò"],
+    "step5_complementi": [
+      { "parole": ["que"], "caso": "congiunzione", "traduzione": "e" },
+      { "parole": ["eum"], "caso": "accusativo", "traduzione": "lo" },
+      { "parole": ["."], "caso": "indeclinabile", "traduzione": "." }
+    ]
+  }
+]
+======================================================
+DEVI copiare questa ESATTA precisione chirurgica. Nessuna parola aggregata in modo errato.`

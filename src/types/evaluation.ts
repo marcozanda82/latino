@@ -1,5 +1,9 @@
 import type { Timestamp } from 'firebase/firestore'
-import type { ExerciseType, VersionSegmentSubmission } from './version'
+import type {
+  ExerciseType,
+  VersionSegmentStepAnswers,
+  VersionSegmentSubmission,
+} from './version'
 
 export type EvaluationStatus =
   | 'in_attesa'
@@ -35,6 +39,8 @@ export interface PendingTranslation {
   freeTranslation?: string
   /** Traduzioni per segmento (solo moduli versione) */
   segmentTranslations?: VersionSegmentSubmission[]
+  /** Risposte step-by-step (frasi singole, modalità review) */
+  stepAnswers?: VersionSegmentStepAnswers
   /** Feedback del tutor (versioni e, in futuro, frasi) */
   tutorNotes?: string
   createdAt?: Timestamp

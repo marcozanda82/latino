@@ -18,6 +18,7 @@ interface SelfAssessmentTranslationProps {
   onSuccessChange?: (success: boolean) => void
   initialTranslation?: string
   initialConfirmed?: boolean
+  readOnly?: boolean
 }
 
 export function SelfAssessmentTranslation({
@@ -30,11 +31,12 @@ export function SelfAssessmentTranslation({
   onSuccessChange,
   initialTranslation = '',
   initialConfirmed = false,
+  readOnly = false,
 }: SelfAssessmentTranslationProps) {
   const [translation, setTranslation] = useState(initialTranslation)
   const [isVerified, setIsVerified] = useState(false)
   const [isAutoSuccess, setIsAutoSuccess] = useState(initialConfirmed)
-  const [isSuccess, setIsSuccess] = useState(initialConfirmed)
+  const [isSuccess, setIsSuccess] = useState(initialConfirmed || readOnly)
   const speechBaseRef = useRef('')
 
   const {
@@ -46,7 +48,7 @@ export function SelfAssessmentTranslation({
   } = useSpeechToText()
 
   const primaryReference = getPrimaryTranslation(referenceTranslation)
-  const inputLocked = isVerified || isSuccess
+  const inputLocked = readOnly || isVerified || isSuccess
 
   useEffect(() => {
     onSuccessChange?.(isSuccess)
@@ -170,7 +172,7 @@ export function SelfAssessmentTranslation({
         )}
       </div>
 
-      {!isVerified && !isSuccess && (
+      {!readOnly && !isVerified && !isSuccess && (
         <button
           type="button"
           onClick={handleVerify}
@@ -182,7 +184,7 @@ export function SelfAssessmentTranslation({
       )}
 
       <AnimatePresence>
-        {isAutoSuccess && (
+        {(isAutoSuccess || (readOnly && isSuccess)) && (
           <motion.section
             key="auto-success"
             initial={{ opacity: 0, y: 16 }}
@@ -201,7 +203,7 @@ export function SelfAssessmentTranslation({
           </motion.section>
         )}
 
-        {isVerified && !isAutoSuccess && (
+        {!readOnly && isVerified && !isAutoSuccess && (
           <motion.section
             key="feedback"
             initial={{ opacity: 0, y: 16 }}

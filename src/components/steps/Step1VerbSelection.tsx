@@ -22,6 +22,7 @@ interface Step1VerbSelectionProps {
   }) => void
   /** Compito in classe: niente toast che rivelano la risposta */
   classroomMode?: boolean
+  readOnly?: boolean
 }
 
 const GENERIC_VERB_ERROR = 'Parola sbagliata. Riprova.'
@@ -44,6 +45,7 @@ export function Step1VerbSelection({
   initialPlacedTileId = null,
   onStateSnapshot,
   classroomMode = false,
+  readOnly = false,
 }: Step1VerbSelectionProps) {
   const tiles = useMemo(
     () => buildTiles(analysis.parole_array),
@@ -82,7 +84,7 @@ export function Step1VerbSelection({
 
   const handlePoolTileClick = useCallback(
     (tile: TileData) => {
-      if (isComplete || isPunctuation(tile.word)) return
+      if (readOnly || isComplete || isPunctuation(tile.word)) return
 
       const isCorrect = isCorrectVerbWord(
         tile.word,
@@ -109,18 +111,19 @@ export function Step1VerbSelection({
       isComplete,
       onError,
       onMistake,
+      readOnly,
     ],
   )
 
   const handlePlacedTileClick = useCallback(() => {
-    if (isComplete) return
+    if (readOnly || isComplete) return
     setPlacedTileId(null)
     setErrorTileId(null)
     setIsComplete(false)
-  }, [isComplete])
+  }, [isComplete, readOnly])
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className={['flex flex-col gap-6', readOnly ? 'pointer-events-none' : ''].join(' ')}>
       <Shelf
         tiles={tiles}
         placedTileIds={placedTileId ? [placedTileId] : []}

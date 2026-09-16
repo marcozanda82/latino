@@ -12,10 +12,12 @@ import {
   type Level,
 } from '../services/exerciseService'
 import { subscribeToStudentEvaluations } from '../services/firebaseEvaluations'
+import { useReviewMode } from '../hooks/useReviewMode'
 
 export function PlayLevel() {
   const { levelId } = useParams<{ levelId: string }>()
   const navigate = useNavigate()
+  const isReviewMode = useReviewMode()
   const [level, setLevel] = useState<Level | null>(null)
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
@@ -48,7 +50,7 @@ export function PlayLevel() {
   }, [levelId, navigate])
 
   useEffect(() => {
-    if (!level) return
+    if (!level || isReviewMode) return
 
     const unsubscribe = subscribeToStudentEvaluations((evaluations) => {
       const alreadySubmitted = evaluations.some((evaluation) => {
@@ -67,7 +69,7 @@ export function PlayLevel() {
     })
 
     return unsubscribe
-  }, [level, navigate])
+  }, [level, navigate, isReviewMode])
 
   if (loading) {
     return <PlayLevelSkeleton />
@@ -96,6 +98,7 @@ export function PlayLevel() {
         levelId={level.id}
         levelTitle={level.title}
         customMaxReward={level.customMaxReward}
+        isReviewMode={isReviewMode}
         onBackToLevels={() => navigate('/')}
       />
     )
@@ -107,6 +110,7 @@ export function PlayLevel() {
       levelTitle={level.title}
       levelId={level.id}
       customMaxReward={level.customMaxReward}
+      isReviewMode={isReviewMode}
       onBackToLevels={() => navigate('/')}
     />
   )

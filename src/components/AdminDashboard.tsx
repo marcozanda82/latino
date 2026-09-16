@@ -43,7 +43,7 @@ const TAB_LABELS: Record<AdminTab, string> = {
   esercizi: 'Esercizi',
   obiettivi: 'Premi Shop',
   valutazioni: 'Valutazioni',
-  economia: 'Gestione Economia',
+  economia: IS_DEMO_MODE ? 'Registro Valutazioni' : 'Gestione Economia',
 }
 
 const VERSION_JSON_PLACEHOLDER = `{
@@ -123,8 +123,12 @@ export function AdminDashboard() {
   const visibleAdminTabs = useMemo(
     () =>
       (['esercizi', 'obiettivi', 'valutazioni', 'economia'] as AdminTab[]).filter(
-        (tab) =>
-          SHOW_GAMIFICATION || (tab !== 'obiettivi' && tab !== 'economia'),
+        (tab) => {
+          if (tab === 'obiettivi' || tab === 'economia') {
+            return SHOW_GAMIFICATION || IS_DEMO_MODE
+          }
+          return true
+        },
       ),
     [],
   )

@@ -26,6 +26,7 @@ interface Step2VerbAnalysisProps {
     completed: Record<VerbCategory, boolean>
     selectedAnswers: Partial<Record<VerbCategory, string>>
   }) => void
+  readOnly?: boolean
 }
 
 const ERROR_TOAST =
@@ -108,6 +109,7 @@ export function Step2VerbAnalysis({
   initialCompleted,
   initialSelectedAnswers,
   onStateSnapshot,
+  readOnly = false,
 }: Step2VerbAnalysisProps) {
   const [completed, setCompleted] = useState(() => {
     const base = initialCompleted ?? createInitialCompletedState()
@@ -144,7 +146,7 @@ export function Step2VerbAnalysis({
 
   const handleSelect = useCallback(
     (category: VerbCategory, label: string) => {
-      if (selectedAnswers[category]) return
+      if (readOnly || selectedAnswers[category]) return
       if (
         !isVerbCategoryRequired(category, effectiveModo) ||
         (isIndefiniteSelected &&
@@ -211,6 +213,7 @@ export function Step2VerbAnalysis({
       onError,
       onMistake,
       selectedAnswers,
+      readOnly,
     ],
   )
 
@@ -240,7 +243,7 @@ export function Step2VerbAnalysis({
           }
 
           const hasSelection = Boolean(selectedAnswers[category])
-          const isLocked = hasSelection
+          const isLocked = readOnly || hasSelection
           const selected = selectedAnswers[category]
           const options = getVerbCategoryOptions(
             category,

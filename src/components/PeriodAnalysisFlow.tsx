@@ -18,6 +18,7 @@ import { calculateSegmentReward } from '../utils/scoring'
 import { useSpeechToText } from '../hooks/useSpeechToText'
 import { showError } from '../lib/toast'
 import { getVersionSegmentPrimaryProposizione } from '../utils/proposizione'
+import type { PeriodReviewState } from '../utils/reviewState'
 
 const TIPO_OPTIONS: { value: ProposizioneTipo; label: string }[] = [
   { value: 'principale', label: 'Principale' },
@@ -36,6 +37,8 @@ export interface PeriodAnalysisFlowProps {
   previousContext?: PreviousSegmentContext[]
   onCancel?: () => void
   onComplete?: (result: SentenceExerciseCompleteResult) => void
+  isReviewMode?: boolean
+  initialReview?: PeriodReviewState
 }
 
 export function PeriodAnalysisFlow({
@@ -45,13 +48,19 @@ export function PeriodAnalysisFlow({
   previousContext = [],
   onCancel,
   onComplete,
+  isReviewMode = false,
+  initialReview,
 }: PeriodAnalysisFlowProps) {
-  const [resolvedIds, setResolvedIds] = useState<Set<string>>(() => new Set())
+  const [resolvedIds, setResolvedIds] = useState<Set<string>>(
+    () => new Set(initialReview?.resolvedIds ?? []),
+  )
   const [shakingKey, setShakingKey] = useState<string | null>(null)
   const [microResults, setMicroResults] = useState<
     Record<string, ProposizioneMicroResult>
-  >({})
-  const [finalTranslation, setFinalTranslation] = useState('')
+  >(() => initialReview?.microResults ?? {})
+  const [finalTranslation, setFinalTranslation] = useState(
+    initialReview?.finalTranslation ?? '',
+  )
   const [isSubmitting, setIsSubmitting] = useState(false)
   const speechBaseRef = useRef('')
 
@@ -135,6 +144,8 @@ export function PeriodAnalysisFlow({
 
   const handleClassificationSelect = useCallback(
     (proposizione: Proposizione, selected: ProposizioneTipo) => {
+      if (isReviewMode) return
+
       const key = getProposizioneKey(proposizione)
 
       if (resolvedIds.has(key)) return
@@ -149,7 +160,7 @@ export function PeriodAnalysisFlow({
 
       setResolvedIds((current) => new Set([...current, key]))
     },
-    [resolvedIds],
+    [isReviewMode, resolvedIds],
   )
 
   const handleMicroComplete = useCallback(
@@ -233,7 +244,9 @@ export function PeriodAnalysisFlow({
             {title}
           </h1>
           <p className="mt-2 text-sm leading-relaxed text-slate-600">
-            {!allClassified
+            {isReviewMode
+              ? 'Consultazione del segmento completato — sola lettura.'
+              : !allClassified
               ? 'Classifica ogni proposizione, poi completa l\'analisi logica a 5 step.'
               : !allMicroComplete
                 ? 'Completa l\'analisi e conferma la traduzione libera di ogni proposizione.'
@@ -245,6 +258,14 @@ export function PeriodAnalysisFlow({
       <PreviousContextPanel segments={previousContext} />
 
       <GlassCard>
+        {isReviewMode ? (
+          <div className="mb-6 rounded-lg border border-sky-200 bg-sky-50 px-4 py-3">
+            <p className="text-sm font-medium text-sky-900">
+              Modalità consultazione — segmento completato (sola lettura)
+            </p>
+          </div>
+        ) : null}
+
         <div className="flex flex-col gap-5">
           {segment.proposizioni.map((proposizione, index) => {
             const key = getProposizioneKey(proposizione)
@@ -298,7 +319,7 @@ export function PeriodAnalysisFlow({
                       <motion.button
                         key={chipKey}
                         type="button"
-                        disabled={isResolved}
+                        disabled={isResolved || isReviewMode}
                         onClick={() =>
                           handleClassificationSelect(proposizione, option.value)
                         }
@@ -336,9 +357,10 @@ export function PeriodAnalysisFlow({
                     >
                       <ProposizioneMicroFlow
                         proposizione={proposizione}
-                        isActive={isActiveMicro}
-                        isComplete={microComplete}
+                        isActive={isActiveMicro || isReviewMode}
+                        isComplete={microComplete && !isReviewMode}
                         completedResult={microResults[key]}
+                        isReviewMode={isReviewMode}
                         onComplete={handleMicroComplete}
                       />
                     </motion.div>
@@ -350,7 +372,7 @@ export function PeriodAnalysisFlow({
         </div>
 
         <AnimatePresence>
-          {allMicroComplete && (
+          {(allMicroComplete || isReviewMode) && finalTranslation.trim() ? (
             <motion.section
               initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
@@ -359,77 +381,85 @@ export function PeriodAnalysisFlow({
               <h2 className="text-sm font-semibold text-slate-800">
                 Traduzione finale del segmento
               </h2>
-              <p className="mt-1 text-sm text-slate-500">
-                Unisci le traduzioni dei nuclei in un italiano scorrevole per
-                l&apos;intero segmento.
-              </p>
-
-              <label htmlFor="segment-final-translation" className="sr-only">
-                Traduzione finale del segmento
-              </label>
-              <div className="relative mt-4">
-                <textarea
-                  id="segment-final-translation"
-                  rows={4}
-                  value={finalTranslation}
-                  onChange={(event) => setFinalTranslation(event.target.value)}
-                  placeholder="Scrivi la traduzione fluida del segmento…"
-                  className={[
-                    'w-full resize-y rounded-lg border border-slate-200 bg-white py-3 text-base text-slate-800 shadow-sm outline-none transition-colors placeholder:text-slate-400 focus:border-slate-400',
-                    isSupported ? 'pl-4 pr-12' : 'px-4',
-                  ].join(' ')}
-                />
-
-                {isSupported && (
-                  <motion.button
-                    type="button"
-                    onClick={handleMicToggle}
-                    aria-label={
-                      isListening ? 'Ferma dettatura' : 'Avvia dettatura vocale'
-                    }
-                    aria-pressed={isListening}
-                    animate={
-                      isListening
-                        ? { scale: [1, 1.08, 1], opacity: [1, 0.85, 1] }
-                        : { scale: 1, opacity: 1 }
-                    }
-                    transition={
-                      isListening
-                        ? { duration: 1.2, repeat: Infinity, ease: 'easeInOut' }
-                        : { duration: 0.2 }
-                    }
-                    className={[
-                      'absolute right-2 top-3 flex h-9 w-9 items-center justify-center rounded-full border transition-colors',
-                      isListening
-                        ? 'border-red-300 bg-red-50 text-red-600 can-hover:hover:bg-red-100'
-                        : 'border-slate-200 bg-white text-slate-500 can-hover:hover:border-slate-300 can-hover:hover:bg-slate-50 can-hover:hover:text-slate-700',
-                    ].join(' ')}
-                  >
-                    {isListening ? (
-                      <MicOff className="h-4 w-4" aria-hidden="true" />
-                    ) : (
-                      <Mic className="h-4 w-4" aria-hidden="true" />
-                    )}
-                  </motion.button>
-                )}
-              </div>
-
-              {suggestedFinalTranslation && (
-                <p className="mt-3 text-xs text-slate-500">
-                  Suggerimento: {suggestedFinalTranslation}
+              {isReviewMode ? (
+                <p className="mt-3 text-base leading-relaxed text-slate-800">
+                  {finalTranslation}
                 </p>
-              )}
+              ) : (
+                <>
+                  <p className="mt-1 text-sm text-slate-500">
+                    Unisci le traduzioni dei nuclei in un italiano scorrevole per
+                    l&apos;intero segmento.
+                  </p>
 
-              <button
-                type="button"
-                onClick={handleConfirmSegment}
-                disabled={!finalTranslation.trim() || isSubmitting}
-                className="mt-5 cursor-pointer rounded-lg bg-slate-800 px-6 py-3 text-sm font-medium text-white shadow-sm transition-all can-hover:hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400"
-              >
-                {isSubmitting ? 'Conferma in corso…' : 'Conferma segmento'}
-              </button>
+                  <label htmlFor="segment-final-translation" className="sr-only">
+                    Traduzione finale del segmento
+                  </label>
+                  <div className="relative mt-4">
+                    <textarea
+                      id="segment-final-translation"
+                      rows={4}
+                      value={finalTranslation}
+                      onChange={(event) => setFinalTranslation(event.target.value)}
+                      placeholder="Scrivi la traduzione fluida del segmento…"
+                      className={[
+                        'w-full resize-y rounded-lg border border-slate-200 bg-white py-3 text-base text-slate-800 shadow-sm outline-none transition-colors placeholder:text-slate-400 focus:border-slate-400',
+                        isSupported ? 'pl-4 pr-12' : 'px-4',
+                      ].join(' ')}
+                    />
+
+                    {isSupported && (
+                      <motion.button
+                        type="button"
+                        onClick={handleMicToggle}
+                        aria-label={
+                          isListening ? 'Ferma dettatura' : 'Avvia dettatura vocale'
+                        }
+                        aria-pressed={isListening}
+                        animate={
+                          isListening
+                            ? { scale: [1, 1.08, 1], opacity: [1, 0.85, 1] }
+                            : { scale: 1, opacity: 1 }
+                        }
+                        transition={
+                          isListening
+                            ? { duration: 1.2, repeat: Infinity, ease: 'easeInOut' }
+                            : { duration: 0.2 }
+                        }
+                        className={[
+                          'absolute right-2 top-3 flex h-9 w-9 items-center justify-center rounded-full border transition-colors',
+                          isListening
+                            ? 'border-red-300 bg-red-50 text-red-600 can-hover:hover:bg-red-100'
+                            : 'border-slate-200 bg-white text-slate-500 can-hover:hover:border-slate-300 can-hover:hover:bg-slate-50 can-hover:hover:text-slate-700',
+                        ].join(' ')}
+                      >
+                        {isListening ? (
+                          <MicOff className="h-4 w-4" aria-hidden="true" />
+                        ) : (
+                          <Mic className="h-4 w-4" aria-hidden="true" />
+                        )}
+                      </motion.button>
+                    )}
+                  </div>
+
+                  {suggestedFinalTranslation && (
+                    <p className="mt-3 text-xs text-slate-500">
+                      Suggerimento: {suggestedFinalTranslation}
+                    </p>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={handleConfirmSegment}
+                    disabled={!finalTranslation.trim() || isSubmitting}
+                    className="mt-5 cursor-pointer rounded-lg bg-slate-800 px-6 py-3 text-sm font-medium text-white shadow-sm transition-all can-hover:hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400"
+                  >
+                    {isSubmitting ? 'Conferma in corso…' : 'Conferma segmento'}
+                  </button>
+                </>
+              )}
             </motion.section>
-          )}
+          ) : null}
         </AnimatePresence>
       </GlassCard>
 

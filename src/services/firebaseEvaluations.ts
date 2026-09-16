@@ -4,6 +4,7 @@ import {
   deleteDoc,
   doc,
   getDoc,
+  getDocs,
   onSnapshot,
   orderBy,
   query,
@@ -20,7 +21,10 @@ import { db } from '../config/firebase'
 import { creditSesterzi, reverseSesterziCredit } from './studentService'
 import { matchesTranslation } from '../utils/textNormalization'
 import type { TranslationValue } from '../types'
-import type { VersionSegmentSubmission } from '../types/version'
+import type {
+  VersionSegmentStepAnswers,
+  VersionSegmentSubmission,
+} from '../types/version'
 
 const EVALUATIONS_COLLECTION = 'evaluations'
 const PENDING_STATUS: EvaluationStatus = 'in_attesa'
@@ -46,6 +50,40 @@ function normalizeStatus(value: unknown): EvaluationStatus | null {
 function normalizeMechanicalScore(value: unknown): number | null {
   const score = typeof value === 'number' ? value : Number(value)
   return Number.isFinite(score) ? score : null
+}
+
+function normalizeEvaluationStepAnswers(
+  value: unknown,
+): VersionSegmentStepAnswers | undefined {
+  if (!value || typeof value !== 'object') return undefined
+  const data = value as Record<string, unknown>
+  if (
+    (data.step1PlacedTileId !== null &&
+      typeof data.step1PlacedTileId !== 'string') ||
+    !data.step2SelectedAnswers ||
+    typeof data.step2SelectedAnswers !== 'object' ||
+    !Array.isArray(data.step3PlacedTileIds) ||
+    typeof data.step3ImplicitSuccess !== 'boolean' ||
+    typeof data.studentCoreTranslation !== 'string' ||
+    !Array.isArray(data.studentComplementTranslations)
+  ) {
+    return undefined
+  }
+
+  return {
+    step1PlacedTileId:
+      typeof data.step1PlacedTileId === 'string' ? data.step1PlacedTileId : null,
+    step2SelectedAnswers:
+      data.step2SelectedAnswers as VersionSegmentStepAnswers['step2SelectedAnswers'],
+    step3PlacedTileIds: data.step3PlacedTileIds.filter(
+      (id): id is string => typeof id === 'string',
+    ),
+    step3ImplicitSuccess: data.step3ImplicitSuccess,
+    studentCoreTranslation: data.studentCoreTranslation,
+    studentComplementTranslations: data.studentComplementTranslations.filter(
+      (item): item is string => typeof item === 'string',
+    ),
+  }
 }
 
 function mapDocToPendingTranslation(
@@ -157,6 +195,7 @@ function mapDocToPendingTranslation(
       typeof data.tutorNotes === 'string' && data.tutorNotes.trim()
         ? data.tutorNotes.trim()
         : undefined,
+    stepAnswers: normalizeEvaluationStepAnswers(data.stepAnswers),
     status,
     createdAt: data.createdAt as Timestamp | undefined,
   }
@@ -206,6 +245,7 @@ export async function submitTranslationForReview(
       ...(data.freeTranslation?.trim()
         ? { freeTranslation: data.freeTranslation.trim() }
         : {}),
+      ...(data.stepAnswers ? { stepAnswers: data.stepAnswers } : {}),
       createdAt: serverTimestamp(),
     })
 
@@ -416,6 +456,39 @@ export function subscribeToStudentEvaluations(
       callback([])
     },
   )
+}
+
+export async function getArchivedEvaluationForLevel(
+  levelId: string,
+): Promise<PendingTranslation | null> {
+  if (!levelId.trim()) return null
+
+  try {
+    const evaluationsQuery = query(
+      collection(db, EVALUATIONS_COLLECTION),
+      orderBy('createdAt', 'desc'),
+    )
+    const snapshot = await getDocs(evaluationsQuery)
+
+    for (const docSnap of snapshot.docs) {
+      const evaluation = mapDocToPendingTranslation(docSnap.id, docSnap.data())
+      if (
+        evaluation &&
+        evaluation.levelId === levelId &&
+        isArchivedEvaluation(evaluation.status)
+      ) {
+        return evaluation
+      }
+    }
+
+    return null
+  } catch (error) {
+    console.error(
+      '[firebaseEvaluations] getArchivedEvaluationForLevel failed:',
+      error,
+    )
+    return null
+  }
 }
 
 export function subscribeToArchivedEvaluations(

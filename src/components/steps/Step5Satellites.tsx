@@ -27,6 +27,8 @@ interface Step5SatellitesProps {
     caseLocked: boolean
     selectedCase: LatinCase | null
   }) => void
+  readOnly?: boolean
+  reviewTranslations?: string[]
 }
 
 interface CaseChipProps {
@@ -95,6 +97,8 @@ export function Step5Satellites({
   initialCaseLocked = false,
   initialSelectedCase = null,
   onStateSnapshot,
+  readOnly = false,
+  reviewTranslations,
 }: Step5SatellitesProps) {
   const interactiveComplementi = useMemo(
     () => getInteractiveComplementi(complementi),
@@ -118,13 +122,34 @@ export function Step5Satellites({
   }, [currentIndex, caseLocked, selectedCase, onStateSnapshot])
 
   useEffect(() => {
-    if (interactiveComplementi.length === 0) {
-      onComplete()
+    if (readOnly || interactiveComplementi.length === 0) {
+      if (interactiveComplementi.length === 0) onComplete()
+      return
     }
-  }, [interactiveComplementi.length, onComplete])
+  }, [interactiveComplementi.length, onComplete, readOnly])
 
   if (interactiveComplementi.length === 0) {
     return null
+  }
+
+  if (readOnly && reviewTranslations) {
+    return (
+      <div className="flex flex-col gap-4">
+        {interactiveComplementi.map((complemento, index) => (
+          <div
+            key={`${complemento.caso}-${index}`}
+            className="rounded-xl border border-emerald-200 bg-emerald-50/60 p-4"
+          >
+            <p className="text-xs font-semibold uppercase tracking-widest text-emerald-700">
+              {complemento.parole.join(' ')} · {complemento.caso}
+            </p>
+            <p className="mt-2 text-sm font-medium text-slate-800">
+              {reviewTranslations[index] ?? '—'}
+            </p>
+          </div>
+        ))}
+      </div>
+    )
   }
 
   const current = interactiveComplementi[currentIndex]
@@ -132,7 +157,7 @@ export function Step5Satellites({
   const total = interactiveComplementi.length
 
   const handleCaseSelect = (caseValue: LatinCase) => {
-    if (caseLocked) return
+    if (readOnly || caseLocked) return
 
     if (isComplementCaseCorrect(caseValue, current.parole, current.caso)) {
       setSelectedCase(caseValue)
@@ -206,7 +231,7 @@ export function Step5Satellites({
               key={caseValue}
               label={CASE_CHIP_LABELS[caseValue]}
               caseValue={caseValue}
-              isLocked={caseLocked}
+              isLocked={readOnly || caseLocked}
               isSelected={selectedCase === caseValue}
               isShaking={shakingCase === caseValue}
               onSelect={handleCaseSelect}
@@ -236,6 +261,9 @@ export function Step5Satellites({
               onConfirmed={handleTranslationConfirmed}
               onTranslationConfirmed={onTranslationConfirmed}
               onRetry={onMistakeRetry}
+              readOnly={readOnly}
+              initialConfirmed={readOnly}
+              initialTranslation={reviewTranslations?.[currentIndex] ?? ''}
             />
           </motion.section>
         )}

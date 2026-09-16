@@ -46,6 +46,7 @@ interface ProposizioneMicroFlowProps {
   isActive: boolean
   isComplete: boolean
   completedResult?: ProposizioneMicroResult
+  isReviewMode?: boolean
   onComplete: (result: ProposizioneMicroResult) => void
 }
 
@@ -54,6 +55,7 @@ export function ProposizioneMicroFlow({
   isActive,
   isComplete,
   completedResult,
+  isReviewMode = false,
   onComplete,
 }: ProposizioneMicroFlowProps) {
   const analysis = useMemo(
@@ -108,6 +110,44 @@ export function ProposizioneMicroFlow({
     stopListening,
     isSupported,
   } = useSpeechToText()
+
+  useEffect(() => {
+    if (!isReviewMode || !completedResult) return
+
+    setCurrentStep(5)
+    setStep1Complete(true)
+    setStep2Complete(true)
+    setStep3Complete(true)
+    setStep4Complete(true)
+    setStep5Complete(true)
+    setAnalysisComplete(!isReviewMode)
+    setFreeTranslation(completedResult.traduzioneLibera)
+    setMechanicalScore(completedResult.mechanicalScore)
+    setStudentCoreTranslation(completedResult.studentCoreTranslation)
+    setStudentComplementTranslations(completedResult.studentComplementTranslations)
+    setStep1Snapshot({
+      placedTileId: completedResult.step1PlacedTileId,
+      isComplete: true,
+    })
+    setStep2Snapshot({
+      completed: Object.fromEntries(
+        Object.entries(completedResult.step2SelectedAnswers).map(([key]) => [
+          key,
+          true,
+        ]),
+      ) as Record<VerbCategory, boolean>,
+      selectedAnswers: completedResult.step2SelectedAnswers,
+    })
+    setStep3Snapshot({
+      placedTileIds: completedResult.step3PlacedTileIds,
+      implicitSuccess: completedResult.step3ImplicitSuccess,
+    })
+    setStep5Snapshot({
+      currentIndex: Math.max(0, completedResult.studentComplementTranslations.length - 1),
+      caseLocked: true,
+      selectedCase: null,
+    })
+  }, [completedResult, isReviewMode])
 
   const handleMistake = useCallback(() => {
     setMechanicalScore((prev) => Math.max(0, prev - MECHANICAL_PENALTY))
@@ -198,7 +238,7 @@ export function ProposizioneMicroFlow({
     (currentStep === 3 && step3Complete) ||
     (currentStep === 4 && step4Complete)
 
-  if (isComplete && completedResult) {
+  if (isComplete && completedResult && !isReviewMode) {
     return (
       <div className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50/80 px-4 py-3">
         <p className="text-xs font-semibold uppercase tracking-widest text-emerald-600">
@@ -353,6 +393,7 @@ export function ProposizioneMicroFlow({
               onMistake={handleMistake}
               showAvantiButton={false}
               classroomMode
+              readOnly={isReviewMode}
               initialPlacedTileId={step1Snapshot.placedTileId}
               onStateSnapshot={setStep1Snapshot}
             />
@@ -372,6 +413,7 @@ export function ProposizioneMicroFlow({
               onComplete={() => setStep2Complete(true)}
               onError={showError}
               onMistake={handleMistake}
+              readOnly={isReviewMode}
               initialCompleted={step2Snapshot.completed}
               initialSelectedAnswers={step2Snapshot.selectedAnswers}
               onStateSnapshot={setStep2Snapshot}
@@ -392,6 +434,7 @@ export function ProposizioneMicroFlow({
               onError={showError}
               onMistake={handleMistake}
               classroomMode
+              readOnly={isReviewMode}
               initialPlacedTileIds={step3Snapshot.placedTileIds}
               initialImplicitSuccess={step3Snapshot.implicitSuccess}
               onStateSnapshot={setStep3Snapshot}
@@ -414,13 +457,14 @@ export function ProposizioneMicroFlow({
               onComplete={() => setStep4Complete(true)}
               onTranslationConfirmed={setStudentCoreTranslation}
               onMistake={handleMistake}
+              readOnly={isReviewMode}
               initialTranslation={studentCoreTranslation}
-              initialConfirmed={step4Complete}
+              initialConfirmed={step4Complete || isReviewMode}
             />
           </motion.div>
         )}
 
-        {currentStep === 5 && !step5Complete && (
+        {currentStep === 5 && (!step5Complete || isReviewMode) && (
           <motion.div
             key="micro-step-5"
             initial={{ opacity: 0, y: 8 }}
@@ -434,8 +478,12 @@ export function ProposizioneMicroFlow({
               onError={showError}
               onMistakeChip={handleMistake}
               onMistakeRetry={handleMistake}
+              readOnly={isReviewMode}
+              reviewTranslations={
+                isReviewMode ? studentComplementTranslations : undefined
+              }
               initialCurrentIndex={step5Snapshot.currentIndex}
-              initialCaseLocked={step5Snapshot.caseLocked}
+              initialCaseLocked={step5Snapshot.caseLocked || isReviewMode}
               initialSelectedCase={step5Snapshot.selectedCase}
               onStateSnapshot={setStep5Snapshot}
             />
@@ -443,7 +491,16 @@ export function ProposizioneMicroFlow({
         )}
       </AnimatePresence>
 
-      {currentStep < 5 && (
+      {isReviewMode && freeTranslation.trim() ? (
+        <div className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50/80 px-4 py-3">
+          <p className="text-xs font-semibold uppercase tracking-widest text-emerald-700">
+            Traduzione libera proposizione
+          </p>
+          <p className="mt-2 text-sm text-slate-800">{freeTranslation}</p>
+        </div>
+      ) : null}
+
+      {!isReviewMode && currentStep < 5 && (
         <div className="mt-4 flex justify-end border-t border-slate-200 pt-4">
           <button
             type="button"

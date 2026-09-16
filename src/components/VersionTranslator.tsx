@@ -29,12 +29,14 @@ import type {
   VersionSegmentSubmission,
 } from '../types/version'
 import { getVersionSegmentLatinText } from '../types/version'
+import { buildPeriodReviewState } from '../utils/reviewState'
 
 interface VersionTranslatorProps {
   version: VersionExercise
   levelId?: string
   levelTitle?: string
   customMaxReward?: number
+  isReviewMode?: boolean
   onBackToLevels: () => void
 }
 
@@ -100,8 +102,10 @@ export function VersionTranslator({
   levelId,
   levelTitle,
   customMaxReward,
+  isReviewMode = false,
   onBackToLevels,
 }: VersionTranslatorProps) {
+  const [reviewSegmentId, setReviewSegmentId] = useState<number | null>(null)
   const segmentIds = useMemo(
     () => version.segmenti.map((segment) => segment.id),
     [version.segmenti],
@@ -124,10 +128,16 @@ export function VersionTranslator({
   }, [progress, segmentIds])
 
   const activeSegmentId = progress?.activeSegmentId ?? null
-  const activeSegment =
-    activeSegmentId !== null
-      ? version.segmenti.find((segment) => segment.id === activeSegmentId)
+  const reviewSegment =
+    reviewSegmentId !== null
+      ? version.segmenti.find((segment) => segment.id === reviewSegmentId)
       : undefined
+  const activeSegment =
+    isReviewMode && reviewSegment
+      ? reviewSegment
+      : activeSegmentId !== null
+        ? version.segmenti.find((segment) => segment.id === activeSegmentId)
+        : undefined
 
   useEffect(() => {
     if (!progress || !allSegmentsCompleted || bellaCopiaInitialized) return
@@ -420,7 +430,7 @@ export function VersionTranslator({
     )
   }
 
-  if (activeSegment && !isSubmitted) {
+  if (activeSegment && (!isSubmitted || isReviewMode)) {
     const activeIndex = version.segmenti.findIndex(
       (segment) => segment.id === activeSegment.id,
     )
@@ -450,7 +460,22 @@ export function VersionTranslator({
           title={`${title} · Segmento ${activeIndex + 1}`}
           segmentMaxReward={activeSegment.compenso_assegnato}
           previousContext={previousContext}
-          onCancel={handleCancelSegment}
+          isReviewMode={isReviewMode}
+          initialReview={
+            isReviewMode
+              ? buildPeriodReviewState(
+                  activeSegment,
+                  progress.segments[activeSegment.id],
+                )
+              : undefined
+          }
+          onCancel={() => {
+            if (isReviewMode) {
+              setReviewSegmentId(null)
+              return
+            }
+            void handleCancelSegment()
+          }}
           onComplete={(result) =>
             void handleSegmentComplete(activeSegment.id, result)
           }
@@ -479,7 +504,9 @@ export function VersionTranslator({
             {version.autore}
           </p>
           <p className="mt-3 text-sm text-slate-500">
-            {completedCount}/{version.segmenti.length} segmenti completati
+            {isReviewMode
+              ? 'Consultazione versione completata — sola lettura.'
+              : `${completedCount}/${version.segmenti.length} segmenti completati`}
           </p>
         </div>
       }
@@ -604,6 +631,16 @@ export function VersionTranslator({
                           : 'Risolvi segmento'}
                       </button>
                     ) : null}
+
+                    {isReviewMode && status === 'completed' ? (
+                      <button
+                        type="button"
+                        onClick={() => setReviewSegmentId(segment.id)}
+                        className="mt-4 rounded-lg border border-slate-300 bg-white px-5 py-2.5 text-sm font-medium text-slate-700 shadow-sm transition-colors can-hover:hover:bg-slate-50"
+                      >
+                        Vedi Dettaglio
+                      </button>
+                    ) : null}
                   </GlassCard>
                 </motion.div>
               )
@@ -618,11 +655,18 @@ export function VersionTranslator({
                 Bella copia finale
               </h2>
               <p className="mt-1 text-sm text-slate-500">
-                Abbiamo unito le traduzioni dei segmenti in una bozza. Rifinisci
-                il testo in un italiano scorrevole prima della consegna.
+                {isReviewMode
+                  ? 'Traduzione fluida consegnata dallo studente.'
+                  : 'Abbiamo unito le traduzioni dei segmenti in una bozza. Rifinisci il testo in un italiano scorrevole prima della consegna.'}
               </p>
             </div>
 
+            {isReviewMode ? (
+              <p className="mt-4 text-sm leading-relaxed text-slate-800">
+                {bellaCopiaDraft || progress.bellaCopia || '—'}
+              </p>
+            ) : (
+              <>
             <label
               htmlFor="version-bella-copia"
               className="mt-4 block text-xs font-semibold uppercase tracking-widest text-slate-400"
@@ -639,8 +683,10 @@ export function VersionTranslator({
               placeholder="Riscrivi la versione in un italiano naturale e coerente…"
               className="mt-2 w-full resize-y rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm leading-relaxed text-slate-800 shadow-sm outline-none transition-colors placeholder:text-slate-400 focus:border-slate-400"
             />
+              </>
+            )}
 
-            {!isSubmitted ? (
+            {!isReviewMode && !isSubmitted ? (
               <div className="mt-5 flex flex-wrap gap-3">
                 <button
                   type="button"

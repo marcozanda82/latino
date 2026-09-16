@@ -20,6 +20,7 @@ interface Step3SubjectSelectionProps {
     implicitSuccess: boolean
   }) => void
   classroomMode?: boolean
+  readOnly?: boolean
 }
 
 function buildRemainingWords(analysis: LatinAnalysis): string[] {
@@ -40,6 +41,7 @@ export function Step3SubjectSelection({
   initialImplicitSuccess = false,
   onStateSnapshot,
   classroomMode = false,
+  readOnly = false,
 }: Step3SubjectSelectionProps) {
   const expectedWords = analysis.step3_soggetto.parole_corrette
   const isImplicitExpected = analysis.step3_soggetto.sottinteso
@@ -79,7 +81,7 @@ export function Step3SubjectSelection({
 
   const handlePoolTileClick = useCallback(
     (tile: TileData) => {
-      if (implicitSuccess || isSelectionComplete) return
+      if (readOnly || implicitSuccess || isSelectionComplete) return
       if (placedTileIds.includes(tile.id)) return
 
       if (isImplicitExpected) {
@@ -125,20 +127,21 @@ export function Step3SubjectSelection({
       onMistake,
       placedTileIds,
       tileById,
+      readOnly,
     ],
   )
 
   const handlePlacedTileClick = useCallback(
     (tile: TileData) => {
-      if (implicitSuccess || isSelectionComplete) return
+      if (readOnly || implicitSuccess || isSelectionComplete) return
       setPlacedTileIds((current) => current.filter((id) => id !== tile.id))
       setErrorTileId(null)
     },
-    [implicitSuccess, isSelectionComplete],
+    [implicitSuccess, isSelectionComplete, readOnly],
   )
 
   const handleImplicitClick = useCallback(() => {
-    if (isComplete) return
+    if (readOnly || isComplete) return
 
     if (isImplicitExpected) {
       setImplicitSuccess(true)
@@ -153,10 +156,10 @@ export function Step3SubjectSelection({
       onError(SUBJECT_ERROR_MESSAGES.WRONG_IMPLICIT)
     }
     window.setTimeout(() => setImplicitShaking(false), 500)
-  }, [classroomMode, isComplete, isImplicitExpected, onComplete, onError, onMistake])
+  }, [classroomMode, isComplete, isImplicitExpected, onComplete, onError, onMistake, readOnly])
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className={['flex flex-col gap-6', readOnly ? 'pointer-events-none' : ''].join(' ')}>
       <Shelf
         tiles={tiles}
         placedTileIds={placedTileIds}

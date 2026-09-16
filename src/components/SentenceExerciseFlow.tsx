@@ -81,6 +81,8 @@ export interface SentenceExerciseFlowProps {
   onComplete?: (result: SentenceExerciseCompleteResult) => void
   hideTutorSubmit?: boolean
   initialDraft?: ExerciseDraftData
+  /** Modalità consultazione: esercizio completato, UI non modificabile. */
+  isReviewMode?: boolean
 }
 
 export function SentenceExerciseFlow({
@@ -96,6 +98,7 @@ export function SentenceExerciseFlow({
   onComplete,
   hideTutorSubmit = mode === 'version-segment',
   initialDraft,
+  isReviewMode = false,
 }: SentenceExerciseFlowProps) {
   const showXp = mode === 'standalone'
   const maxReward =
@@ -129,7 +132,7 @@ export function SentenceExerciseFlow({
   const [studentComplementTranslations, setStudentComplementTranslations] =
     useState<string[]>(initialDraft?.studentComplementTranslations ?? [])
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [isSubmitted, setIsSubmitted] = useState(false)
+  const [isSubmitted, setIsSubmitted] = useState(isReviewMode)
   const [earnedSesterzi, setEarnedSesterzi] = useState<number | null>(null)
   const [wasAutoApproved, setWasAutoApproved] = useState(false)
   const [step1Snapshot, setStep1Snapshot] = useState({
@@ -163,10 +166,9 @@ export function SentenceExerciseFlow({
   const [reviewEditStep, setReviewEditStep] = useState<AppStep | null>(null)
 
   useEffect(() => {
-    if (mode === 'standalone' && levelId) {
-      void deleteExerciseDraft(levelId)
-    }
-  }, [levelId, mode])
+    if (isReviewMode || mode !== 'standalone' || !levelId) return
+    void deleteExerciseDraft(levelId)
+  }, [isReviewMode, levelId, mode])
 
   useEffect(() => {
     if (mode === 'standalone' && step5Complete && levelId) {
@@ -193,6 +195,7 @@ export function SentenceExerciseFlow({
 
   const handleStepChange = (step: AppStep) => {
     setCurrentStep(step)
+    if (isReviewMode) return
     if (step < 2) setStep2Complete(false)
     if (step < 3) setStep3Complete(false)
     if (step < 4) {
@@ -315,6 +318,14 @@ export function SentenceExerciseFlow({
         reward,
         autoApproved,
         freeTranslation: freeTranslation.trim() || undefined,
+        stepAnswers: {
+          step1PlacedTileId: step1Snapshot.placedTileId,
+          step2SelectedAnswers: step2Snapshot.selectedAnswers,
+          step3PlacedTileIds: step3Snapshot.placedTileIds,
+          step3ImplicitSuccess: step3Snapshot.implicitSuccess,
+          studentCoreTranslation,
+          studentComplementTranslations,
+        },
       })
       if (levelId) {
         await deleteExerciseDraft(levelId)
@@ -349,16 +360,19 @@ export function SentenceExerciseFlow({
   }
 
   const showAvanti =
-    !inReview &&
-    !step5Complete &&
-    currentStep >= 1 &&
-    currentStep <= 4
+    isReviewMode
+      ? currentStep >= 1 && currentStep <= 4
+      : !inReview &&
+        !step5Complete &&
+        currentStep >= 1 &&
+        currentStep <= 4
 
-  const isAvantiEnabled =
-    (currentStep === 1 && step1Complete) ||
-    (currentStep === 2 && step2Complete) ||
-    (currentStep === 3 && step3Complete) ||
-    (currentStep === 4 && step4Complete)
+  const isAvantiEnabled = isReviewMode
+    ? true
+    : (currentStep === 1 && step1Complete) ||
+      (currentStep === 2 && step2Complete) ||
+      (currentStep === 3 && step3Complete) ||
+      (currentStep === 4 && step4Complete)
 
   const handleAvanti = () => {
     if (currentStep === 1 && step1Complete) handleStepChange(2)
@@ -367,9 +381,11 @@ export function SentenceExerciseFlow({
     else if (currentStep === 4 && step4Complete) handleStepChange(5)
   }
 
-  const showStepContent = !inReview || reviewEditStep !== null
-  const showReviewPanel = inReview && reviewEditStep === null
-  const showCompletionPrompt = step5Complete && !inReview && !isSubmitted
+  const showStepContent =
+    isReviewMode || !inReview || reviewEditStep !== null
+  const showReviewPanel = !isReviewMode && inReview && reviewEditStep === null
+  const showCompletionPrompt =
+    !isReviewMode && step5Complete && !inReview && !isSubmitted
 
   const handleEnterReview = () => {
     setInReview(true)
@@ -420,8 +436,14 @@ export function SentenceExerciseFlow({
     [],
   )
 
-  const headerSubtitle =
-    mode === 'version-segment'
+  const handleReviewStepSelect = (step: AppStep) => {
+    if (!isReviewMode) return
+    setCurrentStep(step)
+  }
+
+  const headerSubtitle = isReviewMode
+    ? 'Consultazione della consegna completata — sola lettura.'
+    : mode === 'version-segment'
       ? inReview
         ? 'Rileggi il tuo lavoro e conferma il segmento quando sei pronta.'
         : step5Complete
@@ -478,26 +500,45 @@ export function SentenceExerciseFlow({
 
           <div className="mt-5 flex items-center gap-3">
             <div className="flex gap-1.5">
-              {([1, 2, 3, 4, 5] as AppStep[]).map((step) => (
-                <div
-                  key={step}
-                  className={[
-                    'h-1.5 w-8 rounded-full transition-colors sm:w-10',
-                    step5Complete || step < currentStep
-                      ? 'bg-emerald-400'
-                      : step === currentStep
-                        ? 'bg-slate-700'
-                        : 'bg-slate-200',
-                  ].join(' ')}
-                />
-              ))}
+              {([1, 2, 3, 4, 5] as AppStep[]).map((step) =>
+                isReviewMode ? (
+                  <button
+                    key={step}
+                    type="button"
+                    onClick={() => handleReviewStepSelect(step)}
+                    aria-label={`Vai allo step ${step}`}
+                    className={[
+                      'h-1.5 w-8 rounded-full transition-colors sm:w-10',
+                      step5Complete || step < currentStep
+                        ? 'bg-emerald-400'
+                        : step === currentStep
+                          ? 'bg-slate-700'
+                          : 'bg-slate-200',
+                    ].join(' ')}
+                  />
+                ) : (
+                  <div
+                    key={step}
+                    className={[
+                      'h-1.5 w-8 rounded-full transition-colors sm:w-10',
+                      step5Complete || step < currentStep
+                        ? 'bg-emerald-400'
+                        : step === currentStep
+                          ? 'bg-slate-700'
+                          : 'bg-slate-200',
+                    ].join(' ')}
+                  />
+                ),
+              )}
             </div>
             <span className="text-xs font-medium text-slate-600">
-              {inReview
-                ? 'Revisione finale'
-                : step5Complete
-                  ? 'Completato'
-                  : `Step ${currentStep} — ${STEP_LABELS[currentStep]}`}
+              {isReviewMode
+                ? `Consultazione · Step ${currentStep} — ${STEP_LABELS[currentStep]}`
+                : inReview
+                  ? 'Revisione finale'
+                  : step5Complete
+                    ? 'Completato'
+                    : `Step ${currentStep} — ${STEP_LABELS[currentStep]}`}
             </span>
           </div>
         </div>
@@ -506,6 +547,14 @@ export function SentenceExerciseFlow({
       <PreviousContextPanel segments={previousContext} />
 
       <GlassCard>
+          {isReviewMode ? (
+            <div className="mb-6 rounded-lg border border-sky-200 bg-sky-50 px-4 py-3">
+              <p className="text-sm font-medium text-sky-900">
+                Modalità consultazione — esercizio completato (sola lettura)
+              </p>
+            </div>
+          ) : null}
+
           {inReview && reviewEditStep !== null ? (
             <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-sky-200 bg-sky-50 px-4 py-3">
               <p className="text-sm font-medium text-sky-900">
@@ -537,6 +586,7 @@ export function SentenceExerciseFlow({
                   onMistake={() => handleStepMistake(XP_PENALTY_SELECTION)}
                   showAvantiButton={false}
                   classroomMode
+                  readOnly={isReviewMode}
                   initialPlacedTileId={step1Snapshot.placedTileId}
                   onStateSnapshot={handleStep1Snapshot}
                 />
@@ -557,6 +607,7 @@ export function SentenceExerciseFlow({
                   onComplete={() => setStep2Complete(true)}
                   onError={showError}
                   onMistake={() => handleStepMistake(XP_PENALTY_CHIP)}
+                  readOnly={isReviewMode}
                   initialCompleted={step2Snapshot.completed}
                   initialSelectedAnswers={step2Snapshot.selectedAnswers}
                   onStateSnapshot={handleStep2Snapshot}
@@ -578,6 +629,7 @@ export function SentenceExerciseFlow({
                   onError={showError}
                   onMistake={() => handleStepMistake(XP_PENALTY_SELECTION)}
                   classroomMode
+                  readOnly={isReviewMode}
                   initialPlacedTileIds={step3Snapshot.placedTileIds}
                   initialImplicitSuccess={step3Snapshot.implicitSuccess}
                   onStateSnapshot={handleStep3Snapshot}
@@ -601,15 +653,17 @@ export function SentenceExerciseFlow({
                   onComplete={() => setStep4Complete(true)}
                   onTranslationConfirmed={setStudentCoreTranslation}
                   onMistake={() => handleStepMistake(XP_PENALTY_RETRY)}
+                  readOnly={isReviewMode}
                   initialTranslation={studentCoreTranslation}
-                  initialConfirmed={step4Complete}
+                  initialConfirmed={step4Complete || isReviewMode}
                 />
               </motion.div>
             )}
 
             {showStepContent &&
               currentStep === 5 &&
-              !(step5Complete && !inReview && !reviewEditStep) && (
+              (isReviewMode ||
+                !(step5Complete && !inReview && !reviewEditStep)) && (
               <motion.div
                 key="step-5"
                 initial={{ opacity: 0, scale: 0.98, y: 12 }}
@@ -624,8 +678,12 @@ export function SentenceExerciseFlow({
                   onError={showError}
                   onMistakeChip={() => handleStepMistake(XP_PENALTY_CHIP)}
                   onMistakeRetry={() => handleStepMistake(XP_PENALTY_RETRY)}
+                  readOnly={isReviewMode}
+                  reviewTranslations={
+                    isReviewMode ? studentComplementTranslations : undefined
+                  }
                   initialCurrentIndex={step5Snapshot.currentIndex}
-                  initialCaseLocked={step5Snapshot.caseLocked}
+                  initialCaseLocked={step5Snapshot.caseLocked || isReviewMode}
                   initialSelectedCase={step5Snapshot.selectedCase}
                   onStateSnapshot={handleStep5Snapshot}
                 />
@@ -699,7 +757,7 @@ export function SentenceExerciseFlow({
             />
           ) : null}
 
-          {showAvanti && (
+          {showAvanti && !isReviewMode ? (
             <motion.div
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: isAvantiEnabled ? 1 : 0.4, y: 0 }}
@@ -714,7 +772,19 @@ export function SentenceExerciseFlow({
                 Avanti
               </button>
             </motion.div>
-          )}
+          ) : null}
+
+          {isReviewMode && currentStep < 5 ? (
+            <div className="mt-6 flex justify-end border-t border-slate-100 pt-6">
+              <button
+                type="button"
+                onClick={handleAvanti}
+                className="cursor-pointer rounded-lg bg-slate-800 px-6 py-2.5 text-sm font-medium text-white shadow-sm transition-all can-hover:hover:bg-slate-700"
+              >
+                Step successivo
+              </button>
+            </div>
+          ) : null}
         </GlassCard>
 
         <footer className="mt-8 text-center">
