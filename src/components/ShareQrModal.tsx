@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Check, Copy, Share2, X } from 'lucide-react'
 import QRCode from 'react-qr-code'
@@ -22,11 +23,18 @@ export function ShareQrModal({ isOpen, onClose }: ShareQrModalProps) {
       return
     }
 
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') onClose()
     }
     window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
+
+    return () => {
+      document.body.style.overflow = previousOverflow
+      window.removeEventListener('keydown', onKeyDown)
+    }
   }, [isOpen, onClose])
 
   const handleCopy = async () => {
@@ -41,11 +49,18 @@ export function ShareQrModal({ isOpen, onClose }: ShareQrModalProps) {
     }
   }
 
-  return (
+  if (typeof document === 'undefined') return null
+
+  return createPortal(
     <AnimatePresence>
       {isOpen ? (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+        <motion.div
+          key="share-qr-overlay"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.18 }}
+          className="fixed inset-0 z-[9999] flex h-[100dvh] w-screen flex-col items-center justify-center overflow-hidden bg-black/50 px-4"
           role="dialog"
           aria-modal="true"
           aria-labelledby="share-qr-title"
@@ -56,7 +71,7 @@ export function ShareQrModal({ isOpen, onClose }: ShareQrModalProps) {
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.96 }}
             transition={{ type: 'spring', stiffness: 280, damping: 28 }}
-            className="relative w-full max-w-sm max-h-[90vh] overflow-y-auto rounded-lg bg-white p-6 shadow-xl"
+            className="relative mx-auto my-auto flex w-full max-w-sm max-h-[80dvh] flex-col items-center justify-center overflow-y-auto rounded-lg bg-white p-6 shadow-2xl"
             onClick={(event) => event.stopPropagation()}
           >
             <button
@@ -68,7 +83,7 @@ export function ShareQrModal({ isOpen, onClose }: ShareQrModalProps) {
               <X className="h-4 w-4" />
             </button>
 
-            <header className="pr-10">
+            <header className="w-full pr-10 text-center sm:text-left">
               <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">
                 Condivisione rapida
               </p>
@@ -80,7 +95,7 @@ export function ShareQrModal({ isOpen, onClose }: ShareQrModalProps) {
               </h2>
             </header>
 
-            <div className="mt-6 flex flex-col items-center">
+            <div className="mt-6 flex w-full flex-col items-center">
               <div className="w-full max-w-[220px] rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
                 <QRCode
                   value={shareUrl || 'https://'}
@@ -116,9 +131,10 @@ export function ShareQrModal({ isOpen, onClose }: ShareQrModalProps) {
               </button>
             </div>
           </motion.div>
-        </div>
+        </motion.div>
       ) : null}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body,
   )
 }
 
