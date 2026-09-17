@@ -4,6 +4,10 @@ import { SelfAssessmentTranslation } from '../SelfAssessmentTranslation'
 import type { Complemento } from '../../types'
 import { getInteractiveComplementi } from '../../utils/complements'
 import {
+  areInvariableCasesSynonymous,
+  isInvariableShieldMatch,
+} from '../../utils/grammatica'
+import {
   CASE_CHIP_LABELS,
   CASE_CHIP_VARIANTS,
   CASE_ERROR_TOAST,
@@ -56,9 +60,11 @@ function CaseChip({
     <motion.button
       type="button"
       layout
-      disabled={isLocked}
+      aria-disabled={isLocked}
       whileTap={isLocked ? undefined : { scale: 0.97 }}
-      onClick={() => onSelect(caseValue)}
+      onClick={() => {
+        if (!isLocked) onSelect(caseValue)
+      }}
       animate={
         isShaking
           ? { x: [0, -8, 8, -6, 6, -3, 3, 0] }
@@ -78,7 +84,10 @@ function CaseChip({
             : variant === 'conjunction'
               ? 'border-teal-200 bg-teal-50 text-teal-800 can-hover:hover:border-teal-300 can-hover:hover:bg-teal-100'
               : 'border-slate-200 bg-white text-slate-700 can-hover:hover:border-slate-300 can-hover:hover:bg-slate-50',
-        isLocked && !isSelected ? 'pointer-events-none opacity-40' : 'cursor-pointer',
+        isLocked && !isSelected ? 'pointer-events-none opacity-40' : '',
+        isLocked && isSelected
+          ? 'cursor-default opacity-100 shadow-sm'
+          : 'cursor-pointer',
       ]
         .filter(Boolean)
         .join(' ')}
@@ -140,11 +149,34 @@ export function Step5Satellites({
 
   const reviewCaseForComplement = (complemento: Complemento): LatinCase | null => {
     const normalized = normalizeCase(complemento.caso)
-    return isValidCase(normalized) ? normalized : null
+    return isValidCase(normalized) ? (normalized as LatinCase) : null
+  }
+
+  const isReviewCaseSelected = (caseValue: LatinCase): boolean => {
+    const referenceCase = reviewCaseForComplement(current)
+    if (!referenceCase) return selectedCase === caseValue
+
+    if (normalizeCase(referenceCase) === normalizeCase(caseValue)) {
+      return true
+    }
+
+    if (readOnly) {
+      return (
+        isInvariableShieldMatch(current.parole, caseValue) &&
+        isComplementCaseCorrect(caseValue, current.parole, current.caso)
+      ) || areInvariableCasesSynonymous(
+        caseValue,
+        current.caso,
+        current.parole,
+      )
+    }
+
+    return false
   }
 
   const effectiveSelectedCase = readOnly
-    ? reviewCaseForComplement(current) ?? selectedCase
+    ? (VALID_CASES.find((caseValue) => isReviewCaseSelected(caseValue)) ??
+      selectedCase)
     : selectedCase
 
   const effectiveCaseLocked = readOnly || caseLocked
@@ -231,7 +263,11 @@ export function Step5Satellites({
               label={CASE_CHIP_LABELS[caseValue]}
               caseValue={caseValue}
               isLocked={effectiveCaseLocked}
-              isSelected={effectiveSelectedCase === caseValue}
+              isSelected={
+                readOnly
+                  ? isReviewCaseSelected(caseValue)
+                  : effectiveSelectedCase === caseValue
+              }
               isShaking={shakingCase === caseValue}
               onSelect={handleCaseSelect}
             />

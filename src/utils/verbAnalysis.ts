@@ -217,6 +217,15 @@ function getTempoOptionsForModo(modo: string | undefined): string[] {
   }
 }
 
+/** Etichetta chip UI per un valore canonico o salvato (es. `indicativo` → `Indicativo`). */
+export function getVerbChipLabel(
+  category: VerbCategory,
+  value: string,
+  modo?: string,
+): string {
+  return getDisplayLabelForExpected(category, value, modo)
+}
+
 function getDisplayLabelForExpected(
   category: VerbCategory,
   expected: string,
@@ -410,6 +419,20 @@ export function isVerbAnswerCorrect(
   )
 }
 
+export function verbChipSelectionsMatch(
+  category: VerbCategory,
+  option: string,
+  selected: string | undefined,
+  modo?: string,
+): boolean {
+  if (!selected?.trim()) return false
+  if (option === selected) return true
+  return (
+    isVerbAnswerCorrect(category, option, selected, modo) ||
+    isVerbAnswerCorrect(category, selected, option, modo)
+  )
+}
+
 export function sanitizeStep2State(
   analisiVerbo: Step2AnalisiVerbo,
   completed: Record<VerbCategory, boolean>,
@@ -452,7 +475,7 @@ export function sanitizeStep2State(
     }
 
     if (isVerbAnswerCorrect(category, selected, expected, modo)) {
-      nextSelected[category] = selected
+      nextSelected[category] = getDisplayLabelForExpected(category, expected, modo)
       nextCompleted[category] = true
       continue
     }

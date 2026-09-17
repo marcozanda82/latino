@@ -26,7 +26,11 @@ import {
   getPrimaryTranslation,
 } from './textNormalization'
 import type { VerbCategory } from './verbAnalysis'
-import { VERB_CATEGORY_ORDER } from './verbAnalysis'
+import {
+  getVerbChipLabel,
+  sanitizeStep2State,
+  VERB_CATEGORY_ORDER,
+} from './verbAnalysis'
 import type { LatinCase } from './caseAnalysis'
 import { getInteractiveComplementi } from './complements'
 
@@ -61,6 +65,39 @@ function findVerbTileId(analysis: LatinAnalysis): string | null {
   return `tile-${verbStartIndex}-${analysis.parole_array[verbStartIndex]}`
 }
 
+function createEmptyStep2Completed(): Record<VerbCategory, boolean> {
+  return {
+    modo: false,
+    persona: false,
+    numero: false,
+    tempo: false,
+    forma: false,
+  }
+}
+
+function sanitizeReviewStep2Answers(
+  analysis: LatinAnalysis,
+  rawAnswers: Partial<Record<VerbCategory, string>>,
+): {
+  completed: Record<VerbCategory, boolean>
+  selectedAnswers: Partial<Record<VerbCategory, string>>
+} {
+  const modo = rawAnswers.modo ?? analysis.step2_analisi_verbo.modo
+  const normalizedAnswers = Object.fromEntries(
+    VERB_CATEGORY_ORDER.flatMap((category) => {
+      const value = rawAnswers[category]
+      if (typeof value !== 'string' || !value.trim()) return []
+      return [[category, getVerbChipLabel(category, value, modo)]]
+    }),
+  ) as Partial<Record<VerbCategory, string>>
+
+  return sanitizeStep2State(
+    analysis.step2_analisi_verbo,
+    createEmptyStep2Completed(),
+    normalizedAnswers,
+  )
+}
+
 function buildStep2FromAnalysis(
   analysis: LatinAnalysis,
 ): {
@@ -81,7 +118,11 @@ function buildStep2FromAnalysis(
     const value = analysis.step2_analisi_verbo[category]
     if (typeof value === 'string' && value.trim()) {
       completed[category] = true
-      selectedAnswers[category] = value
+      selectedAnswers[category] = getVerbChipLabel(
+        category,
+        value,
+        analysis.step2_analisi_verbo.modo,
+      )
     }
   }
 
@@ -111,15 +152,10 @@ export function buildReviewDraftFromEvaluation(
     stepAnswers?.step1PlacedTileId ?? findVerbTileId(analysis)
 
   const step2 = stepAnswers?.step2SelectedAnswers
-    ? {
-        completed: Object.fromEntries(
-          VERB_CATEGORY_ORDER.map((category) => [
-            category,
-            Boolean(stepAnswers.step2SelectedAnswers?.[category]),
-          ]),
-        ) as Record<VerbCategory, boolean>,
-        selectedAnswers: stepAnswers.step2SelectedAnswers,
-      }
+    ? sanitizeReviewStep2Answers(
+        analysis,
+        stepAnswers.step2SelectedAnswers,
+      )
     : buildStep2FromAnalysis(analysis)
 
   const step3PlacedTileIds =

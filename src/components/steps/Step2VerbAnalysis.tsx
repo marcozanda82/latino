@@ -9,6 +9,7 @@ import {
   isVerbAnswerCorrect,
   isVerbCategoryRequired,
   sanitizeStep2State,
+  verbChipSelectionsMatch,
   VERB_CATEGORY_LABELS,
   VERB_CATEGORY_ORDER,
   type VerbCategory,
@@ -90,7 +91,9 @@ function ChipButton({
             ? 'border-red-300 bg-red-50 text-red-700'
             : 'border-slate-200 bg-white text-slate-700 can-hover:hover:border-slate-300 can-hover:hover:bg-slate-50',
         isLocked && !isSelected ? 'pointer-events-none opacity-40' : '',
-        isLocked && isSelected ? 'cursor-default' : 'cursor-pointer',
+        isLocked && isSelected
+          ? 'cursor-default opacity-100 shadow-sm'
+          : 'cursor-pointer',
       ]
         .filter(Boolean)
         .join(' ')}
@@ -265,7 +268,12 @@ export function Step2VerbAnalysis({
               <div className="relative z-20 pointer-events-auto flex flex-wrap gap-2.5">
                 {options.map((option) => {
                   const chipKey = `${category}-${option}`
-                  const isSelected = selected === option
+                  const isSelected = verbChipSelectionsMatch(
+                    category,
+                    option,
+                    selected,
+                    effectiveModo,
+                  )
 
                   return (
                     <ChipButton
