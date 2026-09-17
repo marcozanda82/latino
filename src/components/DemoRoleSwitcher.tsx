@@ -31,18 +31,23 @@ export function DemoRoleSwitcher() {
   if (!IS_DEMO_MODE) return null
 
   const handleSelect = (role: DemoRole) => {
-    if (role === demoRole) return
+    if (role === demoRole) {
+      if (role === 'tutor' && !location.pathname.startsWith('/admin')) {
+        navigate('/admin', { replace: true, state: { adminTab: 'economia' } })
+      } else if (role === 'student' && location.pathname !== '/') {
+        navigate('/', { replace: true })
+      }
+      return
+    }
 
     setDemoRole(role)
 
     if (role === 'tutor') {
-      navigate('/admin')
+      navigate('/admin', { replace: true, state: { adminTab: 'economia' } })
       return
     }
 
-    if (location.pathname.startsWith('/admin')) {
-      navigate('/')
-    }
+    navigate('/', { replace: true })
   }
 
   return (

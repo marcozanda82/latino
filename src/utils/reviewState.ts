@@ -141,17 +141,13 @@ export function buildReviewDraftFromEvaluation(
     stepAnswers,
   )
 
-  const interactiveCount = getInteractiveComplementi(
-    analysis.step5_complementi,
-  ).length
-
   const lastComplement = getInteractiveComplementi(analysis.step5_complementi).at(-1)
 
   return {
     userId: '',
     exerciseId: evaluation.levelId ?? '',
     fraseOriginale: analysis.frase_originale,
-    currentStep: 5,
+    currentStep: 1,
     step1Complete: true,
     step2Complete: true,
     step3Complete: true,
@@ -166,7 +162,7 @@ export function buildReviewDraftFromEvaluation(
     step2SelectedAnswers: step2.selectedAnswers as Record<string, string>,
     step3PlacedTileIds,
     step3ImplicitSuccess,
-    step5CurrentIndex: Math.max(0, interactiveCount - 1),
+    step5CurrentIndex: 0,
     step5CaseLocked: true,
     step5SelectedCase: (lastComplement?.caso as LatinCase | undefined) ?? null,
   }

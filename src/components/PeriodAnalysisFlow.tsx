@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Mic, MicOff } from 'lucide-react'
+import { Mic, MicOff, RotateCcw } from 'lucide-react'
 import { AppLayout } from './layout/AppLayout'
 import { GlassCard } from './ui/GlassCard'
 import {
@@ -212,11 +212,37 @@ export function PeriodAnalysisFlow({
     }
   }
 
+  const handleResetSegment = () => {
+    if (isReviewMode || isSubmitting) return
+
+    const confirmed = window.confirm(
+      'Vuoi azzerare i progressi di questo segmento? Ricomincerai dalla classificazione delle proposizioni.',
+    )
+    if (!confirmed) return
+
+    setResolvedIds(new Set())
+    setMicroResults({})
+    setFinalTranslation('')
+    setShakingKey(null)
+  }
+
   return (
     <AppLayout
       header={
         <div className="relative">
           <div className="absolute right-0 top-0 flex flex-col items-end gap-2">
+            {!isReviewMode ? (
+              <button
+                type="button"
+                onClick={handleResetSegment}
+                disabled={isSubmitting}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 shadow-sm transition-colors can-hover:hover:border-slate-300 can-hover:hover:bg-slate-50 can-hover:hover:text-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+                title="Azzera i progressi del segmento in corso"
+              >
+                <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
+                Reset esercizio
+              </button>
+            ) : null}
             <span className="rounded-full border border-slate-200 bg-white/90 px-3 py-1 text-xs font-semibold tabular-nums text-slate-700 shadow-sm">
               Analisi: {averageMechanicalScore}/60
             </span>

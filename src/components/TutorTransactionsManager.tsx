@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Eye } from 'lucide-react'
+import { Copy, Eye } from 'lucide-react'
 import { GlassCard } from './ui/GlassCard'
 import { LevelCardsSkeleton } from './ui/Skeletons'
 import { ManualBonusModal } from './ManualBonusModal'
@@ -19,16 +19,34 @@ import {
   formatTransactionTimestamp,
 } from '../utils/transactionDisplay'
 import { formatSchoolGrade } from '../utils/grades'
+import { duplicateLevelForDemo } from '../services/exerciseService'
 
 export function TutorTransactionsManager() {
   const { balance } = useStudentBalance()
   const { transactions, loading, error } = useStudentTransactions()
   const { gradeEntries, averageGrade } = useExerciseGradeEntries()
   const [revertingId, setRevertingId] = useState<string | null>(null)
+  const [duplicatingId, setDuplicatingId] = useState<string | null>(null)
   const [bonusModalOpen, setBonusModalOpen] = useState(false)
 
   const handleBonusSuccess = useCallback(() => {
     showSuccess('Sesterzi assegnati con successo!')
+  }, [])
+
+  const handleDuplicateForDemo = useCallback(async (levelId: string) => {
+    setDuplicatingId(levelId)
+
+    try {
+      const cloned = await duplicateLevelForDemo(levelId)
+      showSuccess(
+        `Esercizio demo pronto: "${cloned.title}" (ID ${cloned.id}).`,
+      )
+    } catch (duplicateError) {
+      console.error('[TutorTransactionsManager] duplicate failed:', duplicateError)
+      showError('Impossibile duplicare l\'esercizio per la demo.')
+    } finally {
+      setDuplicatingId(null)
+    }
   }, [])
 
   const handleRevert = useCallback(
@@ -106,7 +124,7 @@ export function TutorTransactionsManager() {
               {gradeEntries.map((entry) => (
                 <li
                   key={entry.transactionId}
-                  className="grid gap-3 px-5 py-4 sm:grid-cols-[9rem_minmax(0,1fr)_auto_auto]"
+                  className="grid gap-3 px-5 py-4 sm:grid-cols-[9rem_minmax(0,1fr)_auto_auto_auto]"
                 >
                   <p className="text-xs font-medium tabular-nums text-slate-500 sm:pt-0.5">
                     {formatTransactionTimestamp(entry.timestamp)}
@@ -121,15 +139,31 @@ export function TutorTransactionsManager() {
                   </p>
 
                   {entry.levelId ? (
-                    <Link
-                      to={`/play/${entry.levelId}?mode=review`}
-                      className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition-colors can-hover:hover:border-slate-300 can-hover:hover:bg-slate-50 sm:justify-self-end"
-                    >
-                      <Eye className="h-3.5 w-3.5" aria-hidden="true" />
-                      Vedi Dettaglio
-                    </Link>
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => void handleDuplicateForDemo(entry.levelId!)}
+                        disabled={duplicatingId === entry.levelId}
+                        className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-xs font-semibold text-violet-800 transition-colors can-hover:hover:border-violet-300 can-hover:hover:bg-violet-100 disabled:cursor-not-allowed disabled:opacity-50 sm:justify-self-end"
+                        title="Crea una copia pulita per la presentazione dal vivo"
+                      >
+                        <Copy className="h-3.5 w-3.5" aria-hidden="true" />
+                        {duplicatingId === entry.levelId
+                          ? 'Duplicazione…'
+                          : 'Duplica per Demo'}
+                      </button>
+                      <Link
+                        to={`/play/${entry.levelId}?mode=review`}
+                        className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition-colors can-hover:hover:border-slate-300 can-hover:hover:bg-slate-50 sm:justify-self-end"
+                      >
+                        <Eye className="h-3.5 w-3.5" aria-hidden="true" />
+                        Vedi Dettaglio
+                      </Link>
+                    </>
                   ) : (
-                    <span className="text-xs text-slate-400 sm:text-right">—</span>
+                    <span className="text-xs text-slate-400 sm:col-span-2 sm:text-right">
+                      —
+                    </span>
                   )}
                 </li>
               ))}

@@ -114,7 +114,7 @@ export function ProposizioneMicroFlow({
   useEffect(() => {
     if (!isReviewMode || !completedResult) return
 
-    setCurrentStep(5)
+    setCurrentStep(1)
     setStep1Complete(true)
     setStep2Complete(true)
     setStep3Complete(true)
@@ -143,7 +143,7 @@ export function ProposizioneMicroFlow({
       implicitSuccess: completedResult.step3ImplicitSuccess,
     })
     setStep5Snapshot({
-      currentIndex: Math.max(0, completedResult.studentComplementTranslations.length - 1),
+      currentIndex: 0,
       caseLocked: true,
       selectedCase: null,
     })
@@ -230,6 +230,11 @@ export function ProposizioneMicroFlow({
     else if (currentStep === 2 && step2Complete) setCurrentStep(3)
     else if (currentStep === 3 && step3Complete) setCurrentStep(4)
     else if (currentStep === 4 && step4Complete) setCurrentStep(5)
+  }
+
+  const handleReviewStepSelect = (step: MicroStep) => {
+    if (!isReviewMode) return
+    setCurrentStep(step)
   }
 
   const isAvantiEnabled =
@@ -360,19 +365,36 @@ export function ProposizioneMicroFlow({
       </div>
 
       <div className="mb-4 flex items-center gap-2">
-        {([1, 2, 3, 4, 5] as MicroStep[]).map((step) => (
-          <div
-            key={step}
-            className={[
-              'h-1 flex-1 rounded-full transition-colors',
-              step5Complete || step < currentStep
-                ? 'bg-emerald-400'
-                : step === currentStep
-                  ? 'bg-slate-700'
-                  : 'bg-slate-200',
-            ].join(' ')}
-          />
-        ))}
+        {([1, 2, 3, 4, 5] as MicroStep[]).map((step) =>
+          isReviewMode ? (
+            <button
+              key={step}
+              type="button"
+              onClick={() => handleReviewStepSelect(step)}
+              aria-label={`Consulta step ${step}`}
+              className={[
+                'h-1 flex-1 rounded-full transition-colors',
+                step5Complete || step < currentStep
+                  ? 'bg-emerald-400'
+                  : step === currentStep
+                    ? 'bg-slate-700'
+                    : 'bg-slate-200',
+              ].join(' ')}
+            />
+          ) : (
+            <div
+              key={step}
+              className={[
+                'h-1 flex-1 rounded-full transition-colors',
+                step5Complete || step < currentStep
+                  ? 'bg-emerald-400'
+                  : step === currentStep
+                    ? 'bg-slate-700'
+                    : 'bg-slate-200',
+              ].join(' ')}
+            />
+          ),
+        )}
       </div>
       <p className="mb-4 text-xs font-medium text-slate-600">
         Step {currentStep} — {STEP_LABELS[currentStep]}
@@ -500,7 +522,7 @@ export function ProposizioneMicroFlow({
         </div>
       ) : null}
 
-      {!isReviewMode && currentStep < 5 && (
+      {!isReviewMode && currentStep < 5 ? (
         <div className="mt-4 flex justify-end border-t border-slate-200 pt-4">
           <button
             type="button"
@@ -511,7 +533,19 @@ export function ProposizioneMicroFlow({
             Avanti
           </button>
         </div>
-      )}
+      ) : null}
+
+      {isReviewMode && currentStep < 5 ? (
+        <div className="mt-4 flex justify-end border-t border-slate-200 pt-4">
+          <button
+            type="button"
+            onClick={handleAvanti}
+            className="cursor-pointer rounded-lg bg-slate-800 px-5 py-2 text-sm font-medium text-white shadow-sm transition-all can-hover:hover:bg-slate-700"
+          >
+            Step successivo
+          </button>
+        </div>
+      ) : null}
     </div>
   )
 }

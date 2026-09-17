@@ -6,6 +6,7 @@ import {
   getDoc,
   getDocs,
   onSnapshot,
+  setDoc,
   updateDoc,
 } from 'firebase/firestore'
 import { db } from '../config/firebase'
@@ -252,6 +253,73 @@ export async function createVersionLevel(
   } catch (error) {
     console.error('[exerciseService] createVersionLevel failed:', error)
     throw error
+  }
+}
+
+export async function duplicateLevelForDemo(sourceLevelId: string): Promise<Level> {
+  const source = await fetchLevelById(sourceLevelId)
+  if (!source) {
+    throw new Error('Esercizio sorgente non trovato.')
+  }
+
+  const demoId = `${sourceLevelId}-demo`
+  const createdAt = new Date().toISOString()
+  const title = source.title.trim().endsWith('(Demo)')
+    ? source.title.trim()
+    : `${source.title.trim()} (Demo)`
+  const groupName =
+    source.groupName?.trim() === 'Demo Live'
+      ? source.groupName
+      : 'Demo Live'
+
+  if (isSentenceLevel(source)) {
+    const payload: Record<string, unknown> = {
+      title,
+      groupName,
+      type: 'sentence',
+      analysis: source.analysis,
+      createdAt,
+    }
+
+    if (typeof source.customMaxReward === 'number') {
+      payload.customMaxReward = source.customMaxReward
+    }
+
+    await setDoc(doc(db, LEVELS_COLLECTION, demoId), payload)
+
+    return {
+      id: demoId,
+      title,
+      groupName,
+      type: 'sentence',
+      analysis: source.analysis,
+      createdAt,
+      customMaxReward: source.customMaxReward,
+    }
+  }
+
+  const payload: Record<string, unknown> = {
+    title,
+    groupName,
+    type: 'version',
+    version: source.version,
+    createdAt,
+  }
+
+  if (typeof source.customMaxReward === 'number') {
+    payload.customMaxReward = source.customMaxReward
+  }
+
+  await setDoc(doc(db, LEVELS_COLLECTION, demoId), payload)
+
+  return {
+    id: demoId,
+    title,
+    groupName,
+    type: 'version',
+    version: source.version,
+    createdAt,
+    customMaxReward: source.customMaxReward,
   }
 }
 

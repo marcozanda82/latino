@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { Bot, Check } from 'lucide-react'
 import { JsonLoader } from './JsonLoader'
@@ -59,6 +59,7 @@ const VERSION_JSON_PLACEHOLDER = `{
 
 export function AdminDashboard() {
   const navigate = useNavigate()
+  const location = useLocation()
   const { setDemoRole } = useDemoMode()
   const { levels, loading, saving, addLevel, addVersionLevel, removeLevel, refreshLevels } =
     useExercises()
@@ -137,6 +138,14 @@ export function AdminDashboard() {
       ),
     [],
   )
+
+  useEffect(() => {
+    const requestedTab = (location.state as { adminTab?: AdminTab } | null)
+      ?.adminTab
+    if (requestedTab && visibleAdminTabs.includes(requestedTab)) {
+      setActiveTab(requestedTab)
+    }
+  }, [location.state, visibleAdminTabs])
 
   useEffect(() => {
     if (!visibleAdminTabs.includes(activeTab)) {

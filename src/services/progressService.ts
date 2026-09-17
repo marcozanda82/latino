@@ -77,6 +77,17 @@ export function getWeeklyCompletionCount(): number {
   }).length
 }
 
+export function clearLevelProgress(levelId: string): void {
+  try {
+    const progress = readProgress()
+    if (!(levelId in progress)) return
+    delete progress[levelId]
+    writeProgress(progress)
+  } catch (error) {
+    console.error('[progressService] clearLevelProgress failed:', error)
+  }
+}
+
 export function saveLevelScore(levelId: string, score: number): void {
   try {
     const progress = readProgress()

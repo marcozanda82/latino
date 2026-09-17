@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
+import { RotateCcw } from 'lucide-react'
 import { Step1VerbSelection } from './steps/Step1VerbSelection'
 import { Step2VerbAnalysis } from './steps/Step2VerbAnalysis'
 import { Step3SubjectSelection } from './steps/Step3SubjectSelection'
@@ -26,7 +27,7 @@ import {
 import { calculateSegmentReward } from '../utils/scoring'
 import type { LatinAnalysis } from '../types'
 import type { ExerciseDraftData } from '../types/exerciseDraft'
-import { saveLevelScore } from '../services/progressService'
+import { clearLevelProgress, saveLevelScore } from '../services/progressService'
 import { submitTranslationForReview, canAutoApproveTranslation } from '../services/firebaseEvaluations'
 import {
   getStudentBalanceDocPath,
@@ -164,11 +165,6 @@ export function SentenceExerciseFlow({
   })
   const [inReview, setInReview] = useState(false)
   const [reviewEditStep, setReviewEditStep] = useState<AppStep | null>(null)
-
-  useEffect(() => {
-    if (isReviewMode || mode !== 'standalone' || !levelId) return
-    void deleteExerciseDraft(levelId)
-  }, [isReviewMode, levelId, mode])
 
   useEffect(() => {
     if (mode === 'standalone' && step5Complete && levelId) {
@@ -441,6 +437,54 @@ export function SentenceExerciseFlow({
     setCurrentStep(step)
   }
 
+  const handleResetExercise = async () => {
+    if (isReviewMode || isSubmitting) return
+
+    const confirmed = window.confirm(
+      'Vuoi azzerare i progressi di questo esercizio? Tornerai allo Step 1.',
+    )
+    if (!confirmed) return
+
+    if (levelId) {
+      await deleteExerciseDraft(levelId)
+      clearLevelProgress(levelId)
+    }
+
+    setCurrentStep(1)
+    setStep1Complete(false)
+    setStep2Complete(false)
+    setStep3Complete(false)
+    setStep4Complete(false)
+    setStep5Complete(false)
+    setScore(XP_INITIAL)
+    setMechanicalScore(MECHANICAL_SCORE_INITIAL)
+    setStudentCoreTranslation('')
+    setStudentComplementTranslations([])
+    setIsSubmitting(false)
+    setIsSubmitted(false)
+    setEarnedSesterzi(null)
+    setWasAutoApproved(false)
+    setStep1Snapshot({ placedTileId: null, isComplete: false })
+    setStep2Snapshot({
+      completed: {
+        modo: false,
+        persona: false,
+        numero: false,
+        tempo: false,
+        forma: false,
+      },
+      selectedAnswers: {},
+    })
+    setStep3Snapshot({ placedTileIds: [], implicitSuccess: false })
+    setStep5Snapshot({
+      currentIndex: 0,
+      caseLocked: false,
+      selectedCase: null,
+    })
+    setInReview(false)
+    setReviewEditStep(null)
+  }
+
   const headerSubtitle = isReviewMode
     ? 'Consultazione della consegna completata — sola lettura.'
     : mode === 'version-segment'
@@ -465,6 +509,18 @@ export function SentenceExerciseFlow({
       header={
         <div className="relative">
           <div className="absolute right-0 top-0 flex flex-col items-end gap-2">
+            {!isReviewMode ? (
+              <button
+                type="button"
+                onClick={() => void handleResetExercise()}
+                disabled={isSubmitting}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 shadow-sm transition-colors can-hover:hover:border-slate-300 can-hover:hover:bg-slate-50 can-hover:hover:text-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+                title="Azzera i progressi e ricomincia dall'inizio"
+              >
+                <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
+                Reset esercizio
+              </button>
+            ) : null}
             {showXp ? <ScoreBadge score={score} /> : null}
             <span className="rounded-full border border-slate-200 bg-white/90 px-3 py-1 text-xs font-semibold tabular-nums text-slate-700 shadow-sm">
               Analisi: {mechanicalScore}/60

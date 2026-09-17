@@ -8,6 +8,8 @@ import {
   CASE_CHIP_VARIANTS,
   CASE_ERROR_TOAST,
   isComplementCaseCorrect,
+  isValidCase,
+  normalizeCase,
   VALID_CASES,
   type LatinCase,
 } from '../../utils/caseAnalysis'
@@ -132,29 +134,20 @@ export function Step5Satellites({
     return null
   }
 
-  if (readOnly && reviewTranslations) {
-    return (
-      <div className="flex flex-col gap-4">
-        {interactiveComplementi.map((complemento, index) => (
-          <div
-            key={`${complemento.caso}-${index}`}
-            className="rounded-xl border border-emerald-200 bg-emerald-50/60 p-4"
-          >
-            <p className="text-xs font-semibold uppercase tracking-widest text-emerald-700">
-              {complemento.parole.join(' ')} · {complemento.caso}
-            </p>
-            <p className="mt-2 text-sm font-medium text-slate-800">
-              {reviewTranslations[index] ?? '—'}
-            </p>
-          </div>
-        ))}
-      </div>
-    )
-  }
-
   const current = interactiveComplementi[currentIndex]
   const blockLabel = current.parole.join(' ')
   const total = interactiveComplementi.length
+
+  const reviewCaseForComplement = (complemento: Complemento): LatinCase | null => {
+    const normalized = normalizeCase(complemento.caso)
+    return isValidCase(normalized) ? normalized : null
+  }
+
+  const effectiveSelectedCase = readOnly
+    ? reviewCaseForComplement(current) ?? selectedCase
+    : selectedCase
+
+  const effectiveCaseLocked = readOnly || caseLocked
 
   const handleCaseSelect = (caseValue: LatinCase) => {
     if (readOnly || caseLocked) return
@@ -181,6 +174,12 @@ export function Step5Satellites({
     setCurrentIndex((index) => index + 1)
     setCaseLocked(false)
     setSelectedCase(null)
+  }
+
+  const handleReviewComplementChange = (nextIndex: number) => {
+    if (!readOnly) return
+    if (nextIndex < 0 || nextIndex >= interactiveComplementi.length) return
+    setCurrentIndex(nextIndex)
   }
 
   return (
@@ -231,8 +230,8 @@ export function Step5Satellites({
               key={caseValue}
               label={CASE_CHIP_LABELS[caseValue]}
               caseValue={caseValue}
-              isLocked={readOnly || caseLocked}
-              isSelected={selectedCase === caseValue}
+              isLocked={effectiveCaseLocked}
+              isSelected={effectiveSelectedCase === caseValue}
               isShaking={shakingCase === caseValue}
               onSelect={handleCaseSelect}
             />
@@ -240,8 +239,29 @@ export function Step5Satellites({
         </div>
       </section>
 
+      {readOnly && total > 1 ? (
+        <div className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
+          <button
+            type="button"
+            onClick={() => handleReviewComplementChange(currentIndex - 1)}
+            disabled={currentIndex === 0}
+            className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition-colors disabled:cursor-not-allowed disabled:opacity-40 can-hover:hover:bg-slate-100"
+          >
+            Complemento precedente
+          </button>
+          <button
+            type="button"
+            onClick={() => handleReviewComplementChange(currentIndex + 1)}
+            disabled={currentIndex >= total - 1}
+            className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition-colors disabled:cursor-not-allowed disabled:opacity-40 can-hover:hover:bg-slate-100"
+          >
+            Complemento successivo
+          </button>
+        </div>
+      ) : null}
+
       <AnimatePresence>
-        {caseLocked && (
+        {effectiveCaseLocked && (
           <motion.section
             key="translation-phase"
             initial={{ opacity: 0, y: 16 }}
@@ -265,7 +285,7 @@ export function Step5Satellites({
               initialConfirmed={readOnly}
               initialTranslation={reviewTranslations?.[currentIndex] ?? ''}
               latinWords={current.parole}
-              selectedGrammaticalCase={selectedCase}
+              selectedGrammaticalCase={effectiveSelectedCase}
             />
           </motion.section>
         )}
