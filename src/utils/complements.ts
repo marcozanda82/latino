@@ -3,6 +3,7 @@ import { isValidCase } from './caseAnalysis'
 import { getDefaultCaseForInvariableWord, isInvariableWord } from './grammatica'
 import { getPrimaryTranslation } from './textNormalization'
 import { isPunctuation, withoutPunctuation } from './stringUtils'
+import { resolveItalianTranslation } from './translationEcho'
 import { getVerbParoleFromCorretta } from './verbAnalysis'
 
 function isTranslationValue(value: unknown): value is TranslationValue {
@@ -33,11 +34,21 @@ export function isPunctuationOnlyComplement(complemento: Complemento): boolean {
   )
 }
 
-function buildInvariableComplement(word: string, traduzione: TranslationValue): Complemento {
+function buildInvariableComplement(
+  word: string,
+  traduzione: TranslationValue,
+  fallbackCase?: string,
+): Complemento {
+  const caso = getDefaultCaseForInvariableWord(word)
+  const resolvedTraduzione =
+    typeof traduzione === 'string' && traduzione === word
+      ? resolveItalianTranslation([word], fallbackCase ?? caso) ?? traduzione
+      : traduzione
+
   return {
     parole: [word],
-    caso: getDefaultCaseForInvariableWord(word),
-    traduzione,
+    caso,
+    traduzione: resolvedTraduzione,
   }
 }
 
@@ -69,6 +80,7 @@ export function expandInvariableComplementi(
             complemento.parole.length === 1
               ? complemento.traduzione
               : word,
+            complemento.caso,
           ),
         )
       }
@@ -92,7 +104,7 @@ export function expandInvariableComplementi(
 
       if (isInvariableWord(word)) {
         flushVariableBuffer()
-        expanded.push(buildInvariableComplement(word, word))
+        expanded.push(buildInvariableComplement(word, word, complemento.caso))
         continue
       }
 

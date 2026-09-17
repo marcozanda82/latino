@@ -264,6 +264,8 @@ export function Step5Satellites({
               readOnly={readOnly}
               initialConfirmed={readOnly}
               initialTranslation={reviewTranslations?.[currentIndex] ?? ''}
+              latinWords={current.parole}
+              selectedGrammaticalCase={selectedCase}
             />
           </motion.section>
         )}

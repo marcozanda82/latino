@@ -1,5 +1,6 @@
 import type { VersionExercise, VersionSegment, Proposizione } from '../types/version'
 import { isVersionExercise } from '../types/version'
+import { fixComplementiTranslationEcho } from './translationEcho'
 import {
   isProposizione,
   validateProposizioneCoherence,
@@ -64,7 +65,13 @@ function validateSegmentProposizioni(
       )
     }
 
-    return proposizione
+    return {
+      ...proposizione,
+      step5_complementi: fixComplementiTranslationEcho(
+        proposizione.step5_complementi,
+        proposizione.tipo_proposizione,
+      ),
+    }
   })
 }
 

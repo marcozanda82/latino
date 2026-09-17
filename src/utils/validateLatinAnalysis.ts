@@ -4,6 +4,7 @@ import {
   validateComplementStructure,
   validateComplementsCoherence,
 } from './complements'
+import { fixComplementiTranslationEcho } from './translationEcho'
 import { isValidForm, isValidModo, isIndefiniteMode, verbMatchesParoleArray } from './verbAnalysis'
 import { proposizioneToLatinAnalysis } from './proposizione'
 
@@ -190,7 +191,10 @@ function validateParsedLatinAnalysis(parsed: unknown, index?: number): LatinAnal
     throw new JsonLoadError(`${label}${JSON_LOAD_ERROR} (${coherenceError})`)
   }
 
-  return parsed
+  return {
+    ...parsed,
+    step5_complementi: fixComplementiTranslationEcho(parsed.step5_complementi),
+  }
 }
 
 export function parseLatinAnalysisBatchJson(raw: string): LatinAnalysis[] {

@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Mic, MicOff } from 'lucide-react'
+import { AlertTriangle, Mic, MicOff } from 'lucide-react'
 import type { TranslationValue } from '../types'
 import { useSpeechToText } from '../hooks/useSpeechToText'
+import { getCaseTranslationCoherenceIssue } from '../utils/caseTranslationCoherence'
 import {
   getPrimaryTranslation,
   matchesTranslation,
@@ -19,6 +20,8 @@ interface SelfAssessmentTranslationProps {
   initialTranslation?: string
   initialConfirmed?: boolean
   readOnly?: boolean
+  latinWords?: string[]
+  selectedGrammaticalCase?: string | null
 }
 
 export function SelfAssessmentTranslation({
@@ -32,6 +35,8 @@ export function SelfAssessmentTranslation({
   initialTranslation = '',
   initialConfirmed = false,
   readOnly = false,
+  latinWords,
+  selectedGrammaticalCase = null,
 }: SelfAssessmentTranslationProps) {
   const [translation, setTranslation] = useState(initialTranslation)
   const [isVerified, setIsVerified] = useState(false)
@@ -49,6 +54,15 @@ export function SelfAssessmentTranslation({
 
   const primaryReference = getPrimaryTranslation(referenceTranslation)
   const inputLocked = readOnly || isVerified || isSuccess
+
+  const coherenceIssue = useMemo(() => {
+    if (!latinWords?.length || !selectedGrammaticalCase) return null
+    return getCaseTranslationCoherenceIssue(
+      latinWords,
+      selectedGrammaticalCase,
+      translation,
+    )
+  }, [latinWords, selectedGrammaticalCase, translation])
 
   useEffect(() => {
     onSuccessChange?.(isSuccess)
@@ -93,7 +107,7 @@ export function SelfAssessmentTranslation({
   }
 
   const handleVerify = () => {
-    if (!translation.trim() || isSuccess) return
+    if (!translation.trim() || isSuccess || coherenceIssue) return
 
     if (matchesTranslation(translation, referenceTranslation)) {
       confirmTranslation(translation)
@@ -112,6 +126,8 @@ export function SelfAssessmentTranslation({
   }
 
   const handleConfirm = () => {
+    if (coherenceIssue) return
+
     confirmTranslation(translation)
     setIsSuccess(true)
     onConfirmed()
@@ -136,8 +152,12 @@ export function SelfAssessmentTranslation({
             isSupported && !inputLocked ? 'pl-4 pr-12' : 'px-4',
             isAutoSuccess
               ? 'border-emerald-400 bg-emerald-50 disabled:bg-emerald-50'
-              : 'border-slate-200 disabled:bg-slate-50',
+              : coherenceIssue
+                ? 'border-amber-300 bg-amber-50/40 focus:border-amber-400'
+                : 'border-slate-200 disabled:bg-slate-50',
           ].join(' ')}
+          aria-invalid={coherenceIssue ? true : undefined}
+          aria-describedby={coherenceIssue ? `${inputId}-coherence-hint` : undefined}
         />
 
         {isSupported && !inputLocked && (
@@ -172,11 +192,42 @@ export function SelfAssessmentTranslation({
         )}
       </div>
 
+      <AnimatePresence>
+        {coherenceIssue && !inputLocked && (
+          <motion.div
+            key="coherence-hint"
+            id={`${inputId}-coherence-hint`}
+            role="alert"
+            initial={{ opacity: 0, y: -6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -4 }}
+            transition={{ type: 'spring', stiffness: 320, damping: 28 }}
+            className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 shadow-sm"
+          >
+            <AlertTriangle
+              className="mt-0.5 h-4 w-4 shrink-0 text-amber-600"
+              aria-hidden="true"
+            />
+            <div className="flex flex-col gap-1">
+              <p className="font-medium">Incongruenza tra caso e traduzione</p>
+              <p className="leading-relaxed text-amber-800/90">
+                {coherenceIssue.message}
+              </p>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {!readOnly && !isVerified && !isSuccess && (
         <button
           type="button"
           onClick={handleVerify}
-          disabled={!translation.trim()}
+          disabled={!translation.trim() || Boolean(coherenceIssue)}
+          title={
+            coherenceIssue
+              ? 'Correggi l\'incongruenza tra caso grammaticale e traduzione'
+              : undefined
+          }
           className="cursor-pointer rounded-lg bg-slate-800 px-6 py-3 text-sm font-medium text-white shadow-sm transition-all can-hover:hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400"
         >
           Verifica Traduzione
@@ -223,6 +274,19 @@ export function SelfAssessmentTranslation({
 
             {!isSuccess && (
               <>
+                {coherenceIssue && (
+                  <div
+                    role="alert"
+                    className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"
+                  >
+                    <AlertTriangle
+                      className="mt-0.5 h-4 w-4 shrink-0 text-amber-600"
+                      aria-hidden="true"
+                    />
+                    <p className="leading-relaxed">{coherenceIssue.message}</p>
+                  </div>
+                )}
+
                 <p className="text-sm font-medium text-slate-700">
                   La tua traduzione ha lo stesso significato di quella di
                   riferimento?
@@ -239,7 +303,8 @@ export function SelfAssessmentTranslation({
                   <button
                     type="button"
                     onClick={handleConfirm}
-                    className="cursor-pointer rounded-lg border border-emerald-500 bg-emerald-500 px-5 py-2.5 text-sm font-medium text-white shadow-sm transition-colors can-hover:hover:bg-emerald-600"
+                    disabled={Boolean(coherenceIssue)}
+                    className="cursor-pointer rounded-lg border border-emerald-500 bg-emerald-500 px-5 py-2.5 text-sm font-medium text-white shadow-sm transition-colors can-hover:hover:bg-emerald-600 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-200 disabled:text-slate-400"
                   >
                     Sì, è corretta
                   </button>
