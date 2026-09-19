@@ -116,6 +116,14 @@ Nota per l'output JSON: usa \`id\` al posto di \`segmento_id\`; registra la perc
 REGOLE PER LE PROPOSIZIONI E ANALISI:
 1. Dividi il \`testo_latino\` del segmento in proposizioni logiche.
 2. Per ogni proposizione compila \`testo_proposizione\`, \`tipo_proposizione\` (SOLO valori: 'principale', 'coordinata', 'subordinata') e \`parole_array\`. La somma dei \`parole_array\` di tutte le proposizioni deve ricostruire il segmento intero, punteggiatura inclusa.
+
+=== REGOLA FERREA SULL'ANALISI DEL PERIODO (ASINDETO E PRINCIPALE) ===
+- All'interno di uno stesso periodo o segmento, PUÒ ESISTERE UNA E UNA SOLA proposizione con 'tipo_proposizione': 'principale'.
+- Se ci sono altre proposizioni sintatticamente indipendenti, ma separate dalla principale SOLO tramite punteggiatura (due punti, punto e virgola, virgola) e SENZA congiunzioni coordinanti, esse sono COORDINATE PER ASINDETO.
+- Pertanto, il loro 'tipo_proposizione' DEVE ESSERE RIGOROSAMENTE 'coordinata'.
+- È SEVERAMENTE VIETATO restituire due proposizioni 'principale' all'interno dello stesso segmento.
+===============================================================
+
 3. All'interno di ogni proposizione, esegui i 5 step di analisi:
    - \`step1_verbo\`: { parola_corretta, spiegazione_errore }
    - \`step2_analisi_verbo\`: { modo, forma, tempo, persona, numero } (se indefinito, ometti persona e numero).
