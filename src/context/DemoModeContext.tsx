@@ -18,7 +18,10 @@ export type DemoRole = 'tutor' | 'student'
 interface DemoModeContextValue {
   demoRole: DemoRole
   setDemoRole: (role: DemoRole) => void
+  /** Accesso pannello admin / rotte tutor (rispetta il role switcher in demo). */
   hasTutorAccess: boolean
+  /** Override segmenti (bacchetta): visibile in demo anche simulando lo studente. */
+  canUseTutorOverride: boolean
 }
 
 const DemoModeContext = createContext<DemoModeContextValue | null>(null)
@@ -47,13 +50,16 @@ export function DemoModeProvider({ children }: { children: ReactNode }) {
     ? demoRole === 'tutor'
     : isTutorAuthenticated()
 
+  const canUseTutorOverride = IS_DEMO_MODE || isTutorAuthenticated()
+
   const value = useMemo(
     () => ({
       demoRole,
       setDemoRole,
       hasTutorAccess,
+      canUseTutorOverride,
     }),
-    [demoRole, hasTutorAccess, setDemoRole],
+    [canUseTutorOverride, demoRole, hasTutorAccess, setDemoRole],
   )
 
   return (

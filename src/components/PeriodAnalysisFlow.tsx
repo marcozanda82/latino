@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Mic, MicOff, RotateCcw } from 'lucide-react'
+import { Mic, MicOff, RotateCcw, Wand2 } from 'lucide-react'
 import { AppLayout } from './layout/AppLayout'
 import { GlassCard } from './ui/GlassCard'
 import {
@@ -39,6 +39,8 @@ export interface PeriodAnalysisFlowProps {
   onComplete?: (result: SentenceExerciseCompleteResult) => void
   isReviewMode?: boolean
   initialReview?: PeriodReviewState
+  showTutorForceComplete?: boolean
+  onTutorForceComplete?: () => void
 }
 
 export function PeriodAnalysisFlow({
@@ -50,6 +52,8 @@ export function PeriodAnalysisFlow({
   onComplete,
   isReviewMode = false,
   initialReview,
+  showTutorForceComplete = false,
+  onTutorForceComplete,
 }: PeriodAnalysisFlowProps) {
   const [resolvedIds, setResolvedIds] = useState<Set<string>>(
     () => new Set(initialReview?.resolvedIds ?? []),
@@ -232,16 +236,30 @@ export function PeriodAnalysisFlow({
         <div className="relative">
           <div className="absolute right-0 top-0 flex flex-col items-end gap-2">
             {!isReviewMode ? (
-              <button
-                type="button"
-                onClick={handleResetSegment}
-                disabled={isSubmitting}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 shadow-sm transition-colors can-hover:hover:border-slate-300 can-hover:hover:bg-slate-50 can-hover:hover:text-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
-                title="Azzera i progressi del segmento in corso"
-              >
-                <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
-                Reset esercizio
-              </button>
+              <>
+                {showTutorForceComplete ? (
+                  <button
+                    type="button"
+                    onClick={onTutorForceComplete}
+                    disabled={isSubmitting}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-violet-200 bg-violet-50 px-3 py-1.5 text-xs font-semibold text-violet-800 shadow-sm transition-colors can-hover:hover:border-violet-300 can-hover:hover:bg-violet-100 disabled:cursor-not-allowed disabled:opacity-50"
+                    title="Completamento automatico tutor — sblocca il periodo successivo"
+                  >
+                    <Wand2 className="h-3.5 w-3.5" aria-hidden="true" />
+                    Completa periodo
+                  </button>
+                ) : null}
+                <button
+                  type="button"
+                  onClick={handleResetSegment}
+                  disabled={isSubmitting}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 shadow-sm transition-colors can-hover:hover:border-slate-300 can-hover:hover:bg-slate-50 can-hover:hover:text-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+                  title="Azzera i progressi del segmento in corso"
+                >
+                  <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
+                  Reset esercizio
+                </button>
+              </>
             ) : null}
             <span className="rounded-full border border-slate-200 bg-white/90 px-3 py-1 text-xs font-semibold tabular-nums text-slate-700 shadow-sm">
               Analisi: {averageMechanicalScore}/60

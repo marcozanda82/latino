@@ -108,6 +108,8 @@ export interface VersionProgress {
   levelId: string
   userId?: string
   activeSegmentId: number | null
+  /** Indice 0-based del primo segmento non completato (persistito per resume). */
+  currentSegmentIndex?: number
   segments: Record<number, VersionSegmentProgress>
   bellaCopia?: string
   /** Stato dell'intero esercizio (documento padre versionProgress). */

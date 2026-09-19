@@ -11,11 +11,24 @@ interface TutorPinModalProps {
   isOpen: boolean
   onClose: () => void
   onSuccess: () => void
+  title?: string
+  description?: string
+  errorMessage?: string
+  /** Se false, verifica il PIN senza persistere la sessione tutor. */
+  authenticateOnSuccess?: boolean
 }
 
 const KEYPAD_KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'clear', '0', 'back'] as const
 
-export function TutorPinModal({ isOpen, onClose, onSuccess }: TutorPinModalProps) {
+export function TutorPinModal({
+  isOpen,
+  onClose,
+  onSuccess,
+  title = 'Accesso Tutor',
+  description = 'Inserisci il PIN Tutor per continuare.',
+  errorMessage = 'PIN errato. Riprova.',
+  authenticateOnSuccess = true,
+}: TutorPinModalProps) {
   const [pin, setPin] = useState('')
 
   const handleClose = () => {
@@ -25,13 +38,15 @@ export function TutorPinModal({ isOpen, onClose, onSuccess }: TutorPinModalProps
 
   const handleSubmit = () => {
     if (verifyTutorPin(pin)) {
-      setTutorAuthenticated()
+      if (authenticateOnSuccess) {
+        setTutorAuthenticated()
+      }
       setPin('')
       onSuccess()
       return
     }
 
-    showError('PIN errato. Riprova.')
+    showError(errorMessage)
     setPin('')
   }
 
@@ -70,10 +85,10 @@ export function TutorPinModal({ isOpen, onClose, onSuccess }: TutorPinModalProps
           >
             <GlassCard>
             <h2 className="text-center text-lg font-semibold text-slate-800">
-              Accesso Tutor
+              {title}
             </h2>
             <p className="mt-2 text-center text-sm leading-relaxed text-slate-600">
-              Inserisci il PIN Tutor per continuare.
+              {description}
             </p>
 
             <div className="mt-5 flex justify-center gap-2">

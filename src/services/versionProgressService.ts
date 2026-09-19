@@ -1,4 +1,12 @@
-import { doc, getDoc, serverTimestamp, setDoc, collection, getDocs } from 'firebase/firestore'
+import {
+  collection,
+  doc,
+  getDoc,
+  getDocs,
+  serverTimestamp,
+  setDoc,
+  updateDoc,
+} from 'firebase/firestore'
 import { db } from '../config/firebase'
 import type { ExerciseDraftData } from '../types/exerciseDraft'
 import type {
@@ -156,6 +164,10 @@ function normalizeVersionProgress(
     userId: typeof raw.userId === 'string' ? raw.userId : undefined,
     activeSegmentId:
       typeof raw.activeSegmentId === 'number' ? raw.activeSegmentId : null,
+    currentSegmentIndex:
+      typeof raw.currentSegmentIndex === 'number'
+        ? raw.currentSegmentIndex
+        : undefined,
     segments,
     bellaCopia:
       typeof raw.bellaCopia === 'string' ? raw.bellaCopia : undefined,
@@ -185,8 +197,56 @@ export function createInitialVersionProgress(
     levelId,
     userId,
     activeSegmentId: null,
+    currentSegmentIndex: 0,
     segments,
     status: 'in_progress',
+    updatedAt: new Date().toISOString(),
+  }
+}
+
+/** Primo segmento non completato (0-based); se tutti completati, ultimo indice. */
+export function resolveCurrentSegmentIndex(
+  segmentIds: number[],
+  segments: Record<number, VersionSegmentProgress>,
+): number {
+  const sortedIds = [...segmentIds].sort((a, b) => a - b)
+  if (sortedIds.length === 0) return 0
+
+  const firstIncomplete = sortedIds.findIndex(
+    (id) => segments[id]?.status !== 'completed',
+  )
+
+  if (firstIncomplete === -1) return sortedIds.length - 1
+  return firstIncomplete
+}
+
+export function applySegmentCompletionToProgress(
+  progress: VersionProgress,
+  segmentIds: number[],
+  segmentId: number,
+  completedSegment: VersionSegmentProgress,
+): VersionProgress {
+  const sortedIds = [...segmentIds].sort((a, b) => a - b)
+  const currentIndex = sortedIds.indexOf(segmentId)
+  const nextId =
+    currentIndex >= 0 && currentIndex < sortedIds.length - 1
+      ? sortedIds[currentIndex + 1]
+      : null
+
+  const segments = {
+    ...progress.segments,
+    [segmentId]: completedSegment,
+  }
+
+  if (nextId && segments[nextId]?.status === 'locked') {
+    segments[nextId] = { ...segments[nextId], status: 'available' }
+  }
+
+  return {
+    ...progress,
+    activeSegmentId: null,
+    segments,
+    currentSegmentIndex: resolveCurrentSegmentIndex(sortedIds, segments),
     updatedAt: new Date().toISOString(),
   }
 }
@@ -231,10 +291,16 @@ export function reconcileVersionProgress(
       ? stored.activeSegmentId
       : null
 
+  const currentSegmentIndex =
+    typeof stored.currentSegmentIndex === 'number'
+      ? stored.currentSegmentIndex
+      : resolveCurrentSegmentIndex(sortedIds, segments)
+
   return {
     levelId,
     userId,
     activeSegmentId,
+    currentSegmentIndex,
     segments,
     bellaCopia: stored.bellaCopia,
     status: stored.status ?? 'in_progress',
@@ -334,6 +400,149 @@ export async function saveVersionProgress(
     console.error('[versionProgressService] saveVersionProgress failed:', error)
     throw error
   }
+}
+
+/**
+ * Aggiorna singoli segmenti con path Firestore (merge profondo) senza
+ * sovrascrivere gli altri periodi già completati.
+ */
+export async function patchVersionProgressSegments(
+  userId: string,
+  levelId: string,
+  progress: VersionProgress,
+  changedSegmentIds: number[],
+): Promise<void> {
+  if (!userId.trim() || !levelId.trim()) return
+
+  const docRef = getVersionProgressDocRef(userId, levelId)
+  const payload: Record<string, unknown> = {
+    levelId,
+    userId,
+    activeSegmentId: progress.activeSegmentId,
+    currentSegmentIndex: progress.currentSegmentIndex,
+    updatedAt: new Date().toISOString(),
+    savedAt: serverTimestamp(),
+  }
+
+  for (const segmentId of changedSegmentIds) {
+    const segment = progress.segments[segmentId]
+    if (segment) {
+      payload[`segments.${segmentId}`] = segment
+    }
+  }
+
+  if (typeof progress.bellaCopia === 'string') {
+    payload.bellaCopia = progress.bellaCopia
+  }
+  if (progress.status) {
+    payload.status = progress.status
+  }
+
+  try {
+    const snapshot = await getDoc(docRef)
+    if (snapshot.exists()) {
+      await updateDoc(docRef, payload)
+      return
+    }
+
+    await setDoc(docRef, { ...progress, ...payload }, { merge: true })
+  } catch (error) {
+    console.error(
+      '[versionProgressService] patchVersionProgressSegments failed:',
+      error,
+    )
+    throw error
+  }
+}
+
+/** Read-modify-write: completa un segmento preservando i progressi precedenti. */
+export async function completeVersionSegmentProgress(
+  userId: string,
+  levelId: string,
+  segmentIds: number[],
+  segmentId: number,
+  completedSegment: VersionSegmentProgress,
+): Promise<VersionProgress> {
+  if (!userId.trim() || !levelId.trim()) {
+    throw new Error('Utente o livello non valido.')
+  }
+
+  const stored = await getVersionProgress(userId, levelId)
+  const reconciled = reconcileVersionProgress(
+    stored,
+    levelId,
+    userId,
+    segmentIds,
+  )
+
+  const updated = applySegmentCompletionToProgress(
+    reconciled,
+    segmentIds,
+    segmentId,
+    completedSegment,
+  )
+
+  const sortedIds = [...segmentIds].sort((a, b) => a - b)
+  const currentIndex = sortedIds.indexOf(segmentId)
+  const nextId =
+    currentIndex >= 0 && currentIndex < sortedIds.length - 1
+      ? sortedIds[currentIndex + 1]
+      : null
+
+  const changedIds = [segmentId]
+  if (
+    nextId &&
+    updated.segments[nextId]?.status === 'available' &&
+    reconciled.segments[nextId]?.status === 'locked'
+  ) {
+    changedIds.push(nextId)
+  }
+
+  await patchVersionProgressSegments(userId, levelId, updated, changedIds)
+  return updated
+}
+
+/** Read-modify-write: avvia un segmento aggiornando activeSegmentId. */
+export async function startVersionSegmentProgress(
+  userId: string,
+  levelId: string,
+  segmentIds: number[],
+  segmentId: number,
+): Promise<VersionProgress> {
+  if (!userId.trim() || !levelId.trim()) {
+    throw new Error('Utente o livello non valido.')
+  }
+
+  const stored = await getVersionProgress(userId, levelId)
+  const reconciled = reconcileVersionProgress(
+    stored,
+    levelId,
+    userId,
+    segmentIds,
+  )
+
+  const currentStatus = reconciled.segments[segmentId]?.status
+  if (currentStatus !== 'available' && currentStatus !== 'in_progress') {
+    throw new Error('Segmento non disponibile.')
+  }
+
+  const sortedIds = [...segmentIds].sort((a, b) => a - b)
+  const updated: VersionProgress = {
+    ...reconciled,
+    activeSegmentId: segmentId,
+    currentSegmentIndex: sortedIds.indexOf(segmentId),
+    segments: {
+      ...reconciled.segments,
+      [segmentId]: {
+        ...reconciled.segments[segmentId],
+        status: 'in_progress',
+      },
+    },
+    updatedAt: new Date().toISOString(),
+  }
+
+  await patchVersionProgressSegments(userId, levelId, updated, [segmentId])
+  return updated
 }
 
 export async function listVersionProgressForUser(

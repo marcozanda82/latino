@@ -1,10 +1,19 @@
-import { useCallback, useEffect, useState, type Dispatch, type SetStateAction } from 'react'
-import type { VersionProgress } from '../types/version'
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type Dispatch,
+  type SetStateAction,
+} from 'react'
+import type { VersionProgress, VersionSegmentProgress } from '../types/version'
 import { getStudentUserId } from '../services/studentService'
 import {
+  completeVersionSegmentProgress,
   getVersionProgress,
   reconcileVersionProgress,
   saveVersionProgress,
+  startVersionSegmentProgress,
 } from '../services/versionProgressService'
 
 interface UseVersionProgressResult {
@@ -14,6 +23,11 @@ interface UseVersionProgressResult {
   error: string | null
   userId: string
   persistProgress: (next: VersionProgress) => Promise<void>
+  completeSegment: (
+    segmentId: number,
+    completedSegment: VersionSegmentProgress,
+  ) => Promise<VersionProgress>
+  startSegment: (segmentId: number) => Promise<VersionProgress>
 }
 
 export function useVersionProgress(
@@ -22,8 +36,11 @@ export function useVersionProgress(
 ): UseVersionProgressResult {
   const userId = getStudentUserId()
   const [progress, setProgress] = useState<VersionProgress | null>(null)
+  const progressRef = useRef<VersionProgress | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+
+  progressRef.current = progress
 
   const segmentKey = [...segmentIds].sort((a, b) => a - b).join(',')
 
@@ -77,10 +94,50 @@ export function useVersionProgress(
   const persistProgress = useCallback(
     async (next: VersionProgress) => {
       if (!levelId) return
+      progressRef.current = next
       setProgress(next)
       await saveVersionProgress(userId, levelId, next)
     },
     [levelId, userId],
+  )
+
+  const completeSegment = useCallback(
+    async (segmentId: number, completedSegment: VersionSegmentProgress) => {
+      if (!levelId) {
+        throw new Error('Progressi versione non disponibili.')
+      }
+
+      const updated = await completeVersionSegmentProgress(
+        userId,
+        levelId,
+        segmentIds,
+        segmentId,
+        completedSegment,
+      )
+      progressRef.current = updated
+      setProgress(updated)
+      return updated
+    },
+    [levelId, segmentIds, userId],
+  )
+
+  const startSegment = useCallback(
+    async (segmentId: number) => {
+      if (!levelId) {
+        throw new Error('Progressi versione non disponibili.')
+      }
+
+      const updated = await startVersionSegmentProgress(
+        userId,
+        levelId,
+        segmentIds,
+        segmentId,
+      )
+      progressRef.current = updated
+      setProgress(updated)
+      return updated
+    },
+    [levelId, segmentIds, userId],
   )
 
   return {
@@ -90,5 +147,7 @@ export function useVersionProgress(
     error,
     userId,
     persistProgress,
+    completeSegment,
+    startSegment,
   }
 }

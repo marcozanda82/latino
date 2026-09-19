@@ -1,12 +1,15 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
+import { Wand2 } from 'lucide-react'
 import { AppLayout } from './layout/AppLayout'
 import { GlassCard } from './ui/GlassCard'
 import { LevelCardsSkeleton } from './ui/Skeletons'
 import {
   PeriodAnalysisFlow,
 } from './PeriodAnalysisFlow'
+import { TutorPinModal } from './TutorPinModal'
 import type { SentenceExerciseCompleteResult } from './SentenceExerciseFlow'
+import { useDemoMode } from '../context/DemoModeContext'
 import { showError, showSuccess } from '../lib/toast'
 import { submitVersionForReview } from '../services/firebaseEvaluations'
 import { useVersionProgress } from '../hooks/useVersionProgress'
@@ -17,14 +20,17 @@ import {
   areAllVersionSegmentsCompleted,
   finalizeVersionProgress,
   isVersionExerciseSubmitted,
+  patchVersionProgressSegments,
 } from '../services/versionProgressService'
 import {
   calculateSegmentReward,
 } from '../utils/scoring'
+import { buildPerfectSegmentCompleteResult } from '../utils/buildPerfectSegmentResult'
 import type {
   VersionExercise,
   VersionProgress,
   VersionSegment,
+  VersionSegmentProgress,
   VersionSegmentProgressStatus,
   VersionSegmentSubmission,
 } from '../types/version'
@@ -78,6 +84,25 @@ function buildDefaultBellaCopia(
     .trim()
 }
 
+function buildCompletedSegmentProgress(
+  result: SentenceExerciseCompleteResult,
+): VersionSegmentProgress {
+  return {
+    status: 'completed',
+    mechanicalScore: result.mechanicalScore,
+    traduzioneSegmento: result.studentFullTranslation,
+    xpScore: result.xpScore,
+    stepAnswers: {
+      step1PlacedTileId: result.step1PlacedTileId,
+      step2SelectedAnswers: result.step2SelectedAnswers,
+      step3PlacedTileIds: result.step3PlacedTileIds,
+      step3ImplicitSuccess: result.step3ImplicitSuccess,
+      studentCoreTranslation: result.studentCoreTranslation,
+      studentComplementTranslations: result.studentComplementTranslations,
+    },
+  }
+}
+
 function buildSegmentSubmissionsFromProgress(
   version: VersionExercise,
   progressSnapshot: VersionProgress,
@@ -111,13 +136,16 @@ export function VersionTranslator({
     [version.segmenti],
   )
 
-  const { progress, loading, error, userId, persistProgress, setProgress } =
+  const { progress, loading, error, userId, setProgress, completeSegment, startSegment } =
     useVersionProgress(levelId, segmentIds)
+  const { canUseTutorOverride } = useDemoMode()
 
   const [bellaCopiaDraft, setBellaCopiaDraft] = useState('')
   const [bellaCopiaInitialized, setBellaCopiaInitialized] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [showCompletionModal, setShowCompletionModal] = useState(false)
+  const [tutorOverrideSegment, setTutorOverrideSegment] =
+    useState<VersionSegment | null>(null)
 
   const title = levelTitle?.trim() || version.titolo
   const isSubmitted = progress ? isVersionExerciseSubmitted(progress) : false
@@ -160,38 +188,29 @@ export function VersionTranslator({
       }
 
       try {
-        await persistProgress({
-          ...progress,
-          activeSegmentId: segmentId,
-          segments: {
-            ...progress.segments,
-            [segmentId]: {
-              ...progress.segments[segmentId],
-              status: 'in_progress',
-            },
-          },
-          updatedAt: new Date().toISOString(),
-        })
+        await startSegment(segmentId)
       } catch {
         showError('Impossibile avviare il segmento. Riprova.')
       }
     },
-    [progress, isSubmitted, persistProgress],
+    [progress, isSubmitted, startSegment],
   )
 
   const handleCancelSegment = useCallback(async () => {
-    if (!progress) return
+    if (!progress || !levelId) return
 
     try {
-      await persistProgress({
+      const updated: VersionProgress = {
         ...progress,
         activeSegmentId: null,
         updatedAt: new Date().toISOString(),
-      })
+      }
+      await patchVersionProgressSegments(userId, levelId, updated, [])
+      setProgress(updated)
     } catch {
       showError('Impossibile tornare alla panoramica. Riprova.')
     }
-  }, [progress, persistProgress])
+  }, [progress, levelId, setProgress, userId])
 
   const submitVersionExercise = useCallback(
     async (progressSnapshot: VersionProgress, bellaCopia: string) => {
@@ -249,50 +268,22 @@ export function VersionTranslator({
   }, [onBackToLevels])
 
   const handleSegmentComplete = useCallback(
-    async (segmentId: number, result: SentenceExerciseCompleteResult) => {
-      if (!progress || isSubmitted || isSubmitting) return
+    async (
+      segmentId: number,
+      result: SentenceExerciseCompleteResult,
+    ): Promise<VersionProgress | null> => {
+      if (isSubmitted || isSubmitting) return null
 
-      const sortedIds = [...segmentIds].sort((a, b) => a - b)
-      const currentIndex = sortedIds.indexOf(segmentId)
-      const nextId =
-        currentIndex >= 0 && currentIndex < sortedIds.length - 1
-          ? sortedIds[currentIndex + 1]
-          : null
-
-      const segments = {
-        ...progress.segments,
-        [segmentId]: {
-          status: 'completed' as const,
-          mechanicalScore: result.mechanicalScore,
-          traduzioneSegmento: result.studentFullTranslation,
-          xpScore: result.xpScore,
-          stepAnswers: {
-            step1PlacedTileId: result.step1PlacedTileId,
-            step2SelectedAnswers: result.step2SelectedAnswers,
-            step3PlacedTileIds: result.step3PlacedTileIds,
-            step3ImplicitSuccess: result.step3ImplicitSuccess,
-            studentCoreTranslation: result.studentCoreTranslation,
-            studentComplementTranslations: result.studentComplementTranslations,
-          },
-        },
-      }
-
-      if (nextId && segments[nextId]?.status === 'locked') {
-        segments[nextId] = { ...segments[nextId], status: 'available' }
-      }
-
-      const updatedProgress: VersionProgress = {
-        ...progress,
-        activeSegmentId: null,
-        segments,
-        updatedAt: new Date().toISOString(),
-      }
+      let updatedProgress: VersionProgress
 
       try {
-        await persistProgress(updatedProgress)
+        updatedProgress = await completeSegment(
+          segmentId,
+          buildCompletedSegmentProgress(result),
+        )
       } catch {
         showError('Impossibile salvare il segmento completato. Riprova.')
-        return
+        return null
       }
 
       const allComplete = areAllVersionSegmentsCompleted(
@@ -322,7 +313,7 @@ export function VersionTranslator({
         } finally {
           setIsSubmitting(false)
         }
-        return
+        return updatedProgress
       }
 
       if (allComplete) {
@@ -335,36 +326,93 @@ export function VersionTranslator({
         )
         setBellaCopiaInitialized(true)
       }
+
+      return updatedProgress
     },
     [
+      completeSegment,
       handleVersionCompletionSuccess,
       isSubmitted,
       isSubmitting,
-      persistProgress,
-      progress,
       segmentIds,
       submitVersionExercise,
       version.segmenti,
     ],
   )
 
+  const requestTutorForceComplete = useCallback(
+    (segment: VersionSegment) => {
+      if (!canUseTutorOverride || isSubmitted || isSubmitting || isReviewMode) return
+
+      const segmentProgress = progress?.segments[segment.id]
+      if (segmentProgress?.status === 'completed') return
+
+      setTutorOverrideSegment(segment)
+    },
+    [
+      canUseTutorOverride,
+      isReviewMode,
+      isSubmitted,
+      isSubmitting,
+      progress?.segments,
+    ],
+  )
+
+  const executeTutorForceComplete = useCallback(
+    async (segment: VersionSegment) => {
+      try {
+        const perfectResult = buildPerfectSegmentCompleteResult(segment)
+        const updatedProgress = await handleSegmentComplete(
+          segment.id,
+          perfectResult,
+        )
+        if (!updatedProgress) return
+
+        const sortedIds = [...segmentIds].sort((a, b) => a - b)
+        const nextIndex = sortedIds.indexOf(segment.id) + 1
+        if (nextIndex < sortedIds.length) {
+          const nextId = sortedIds[nextIndex]
+          if (updatedProgress.segments[nextId]?.status === 'available') {
+            await startSegment(nextId)
+          }
+        }
+
+        showSuccess(`Segmento ${segment.id} completato automaticamente.`)
+      } catch (forceError) {
+        console.error('[VersionTranslator] tutor force complete failed:', forceError)
+        showError('Impossibile completare automaticamente il segmento.')
+      }
+    },
+    [handleSegmentComplete, segmentIds, startSegment],
+  )
+
+  const handleTutorOverridePinSuccess = useCallback(() => {
+    const segment = tutorOverrideSegment
+    setTutorOverrideSegment(null)
+    if (segment) {
+      void executeTutorForceComplete(segment)
+    }
+  }, [executeTutorForceComplete, tutorOverrideSegment])
+
   const handleBellaCopiaChange = (value: string) => {
     setBellaCopiaDraft(value)
   }
 
   const handleBellaCopiaBlur = useCallback(async () => {
-    if (!progress || isSubmitted) return
+    if (!progress || !levelId || isSubmitted) return
 
     try {
-      await persistProgress({
+      const updated: VersionProgress = {
         ...progress,
         bellaCopia: bellaCopiaDraft,
         updatedAt: new Date().toISOString(),
-      })
+      }
+      await patchVersionProgressSegments(userId, levelId, updated, [])
+      setProgress(updated)
     } catch {
       console.error('[VersionTranslator] bellaCopia save failed')
     }
-  }, [progress, isSubmitted, persistProgress, bellaCopiaDraft])
+  }, [bellaCopiaDraft, isSubmitted, levelId, progress, setProgress, userId])
 
   const handleSubmitVersion = async () => {
     if (!progress || !allSegmentsCompleted || isSubmitted || isSubmitting) return
@@ -391,6 +439,18 @@ export function VersionTranslator({
   const completionModal = showCompletionModal ? (
     <VersionCompletionModal onDismiss={handleDismissCompletionModal} />
   ) : null
+
+  const tutorOverridePinModal = (
+    <TutorPinModal
+      isOpen={tutorOverrideSegment !== null}
+      onClose={() => setTutorOverrideSegment(null)}
+      onSuccess={handleTutorOverridePinSuccess}
+      title="Sblocco forzato periodo"
+      description="Inserisci il PIN Tutor per completare automaticamente questo segmento e sbloccare il successivo."
+      errorMessage="Password errata"
+      authenticateOnSuccess={false}
+    />
+  )
 
   if (loading) {
     return (
@@ -454,6 +514,7 @@ export function VersionTranslator({
     return (
       <>
         {completionModal}
+        {tutorOverridePinModal}
         <PeriodAnalysisFlow
           key={activeSegment.id}
           segment={activeSegment}
@@ -461,6 +522,12 @@ export function VersionTranslator({
           segmentMaxReward={activeSegment.compenso_assegnato}
           previousContext={previousContext}
           isReviewMode={isReviewMode}
+          showTutorForceComplete={
+            canUseTutorOverride &&
+            !isReviewMode &&
+            progress.segments[activeSegment.id]?.status !== 'completed'
+          }
+          onTutorForceComplete={() => requestTutorForceComplete(activeSegment)}
           initialReview={
             isReviewMode
               ? buildPeriodReviewState(
@@ -491,6 +558,7 @@ export function VersionTranslator({
   return (
     <>
       {completionModal}
+      {tutorOverridePinModal}
       <AppLayout
       header={
         <div>
@@ -620,17 +688,34 @@ export function VersionTranslator({
                       </p>
                     ) : null}
 
-                    {canStart ? (
-                      <button
-                        type="button"
-                        onClick={() => void handleStartSegment(segment.id)}
-                        className="mt-4 rounded-lg bg-slate-800 px-5 py-2.5 text-sm font-medium text-white shadow-sm transition-colors can-hover:hover:bg-slate-700"
-                      >
-                        {status === 'in_progress'
-                          ? 'Riprendi segmento'
-                          : 'Risolvi segmento'}
-                      </button>
-                    ) : null}
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      {canStart ? (
+                        <button
+                          type="button"
+                          onClick={() => void handleStartSegment(segment.id)}
+                          className="rounded-lg bg-slate-800 px-5 py-2.5 text-sm font-medium text-white shadow-sm transition-colors can-hover:hover:bg-slate-700"
+                        >
+                          {status === 'in_progress'
+                            ? 'Riprendi segmento'
+                            : 'Risolvi segmento'}
+                        </button>
+                      ) : null}
+
+                      {canUseTutorOverride &&
+                      !isReviewMode &&
+                      !isSubmitted &&
+                      status !== 'completed' ? (
+                        <button
+                          type="button"
+                          onClick={() => requestTutorForceComplete(segment)}
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-violet-200 bg-violet-50 px-4 py-2.5 text-sm font-medium text-violet-800 shadow-sm transition-colors can-hover:hover:border-violet-300 can-hover:hover:bg-violet-100"
+                          title="Completamento automatico tutor"
+                        >
+                          <Wand2 className="h-4 w-4" aria-hidden="true" />
+                          Sblocca periodo
+                        </button>
+                      ) : null}
+                    </div>
 
                     {isReviewMode && status === 'completed' ? (
                       <button
