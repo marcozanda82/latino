@@ -20,6 +20,7 @@ import {
   areAllVersionSegmentsCompleted,
   finalizeVersionProgress,
   isVersionExerciseSubmitted,
+  patchSegmentFreeTranslation,
   patchVersionProgressSegments,
 } from '../services/versionProgressService'
 import {
@@ -34,7 +35,10 @@ import type {
   VersionSegmentProgressStatus,
   VersionSegmentSubmission,
 } from '../types/version'
-import { getVersionSegmentLatinText } from '../types/version'
+import {
+  getSegmentDisplayTranslation,
+  getVersionSegmentLatinText,
+} from '../types/version'
 import { buildPeriodReviewState } from '../utils/reviewState'
 
 interface VersionTranslatorProps {
@@ -74,10 +78,10 @@ const STATUS_LABELS: Record<
 
 function buildDefaultBellaCopia(
   segments: VersionSegment[],
-  segmentProgress: Record<number, { traduzioneSegmento?: string }>,
+  segmentProgress: Record<number, VersionSegmentProgress>,
 ): string {
   return segments
-    .map((segment) => segmentProgress[segment.id]?.traduzioneSegmento?.trim() ?? '')
+    .map((segment) => getSegmentDisplayTranslation(segmentProgress[segment.id]))
     .filter(Boolean)
     .join(' ')
     .replace(/\s+/g, ' ')
@@ -112,7 +116,7 @@ function buildSegmentSubmissionsFromProgress(
     return {
       id: segment.id,
       latino: getVersionSegmentLatinText(segment),
-      traduzioneSegmento: segmentProgress?.traduzioneSegmento?.trim() ?? '',
+      traduzioneSegmento: getSegmentDisplayTranslation(segmentProgress),
       mechanicalScore: segmentProgress?.mechanicalScore ?? 0,
       compensoAssegnato: segment.compenso_assegnato,
       xpScore: segmentProgress?.xpScore,
@@ -131,6 +135,9 @@ export function VersionTranslator({
   onBackToLevels,
 }: VersionTranslatorProps) {
   const [reviewSegmentId, setReviewSegmentId] = useState<number | null>(null)
+  const [tutorViewSegmentId, setTutorViewSegmentId] = useState<number | null>(
+    null,
+  )
   const segmentIds = useMemo(
     () => version.segmenti.map((segment) => segment.id),
     [version.segmenti],
@@ -160,12 +167,17 @@ export function VersionTranslator({
     reviewSegmentId !== null
       ? version.segmenti.find((segment) => segment.id === reviewSegmentId)
       : undefined
+  const tutorViewSegment =
+    tutorViewSegmentId !== null
+      ? version.segmenti.find((segment) => segment.id === tutorViewSegmentId)
+      : undefined
   const activeSegment =
     isReviewMode && reviewSegment
       ? reviewSegment
-      : activeSegmentId !== null
-        ? version.segmenti.find((segment) => segment.id === activeSegmentId)
-        : undefined
+      : tutorViewSegment ??
+        (activeSegmentId !== null
+          ? version.segmenti.find((segment) => segment.id === activeSegmentId)
+          : undefined)
 
   useEffect(() => {
     if (!progress || !allSegmentsCompleted || bellaCopiaInitialized) return
@@ -386,6 +398,37 @@ export function VersionTranslator({
     [handleSegmentComplete, segmentIds, startSegment],
   )
 
+  const handleSaveSegmentFreeTranslation = useCallback(
+    async (segmentId: number, translation: string) => {
+      if (!levelId) {
+        throw new Error('Progressi versione non disponibili.')
+      }
+
+      await patchSegmentFreeTranslation(
+        userId,
+        levelId,
+        segmentId,
+        translation,
+      )
+
+      setProgress((current) => {
+        if (!current) return current
+        return {
+          ...current,
+          segments: {
+            ...current.segments,
+            [segmentId]: {
+              ...current.segments[segmentId],
+              traduzioneLiberaStudente: translation.trim(),
+            },
+          },
+          updatedAt: new Date().toISOString(),
+        }
+      })
+    },
+    [levelId, setProgress, userId],
+  )
+
   const handleTutorOverridePinSuccess = useCallback(() => {
     const segment = tutorOverrideSegment
     setTutorOverrideSegment(null)
@@ -490,10 +533,18 @@ export function VersionTranslator({
     )
   }
 
-  if (activeSegment && (!isSubmitted || isReviewMode)) {
+  if (
+    activeSegment &&
+    (!isSubmitted || isReviewMode || tutorViewSegmentId !== null)
+  ) {
     const activeIndex = version.segmenti.findIndex(
       (segment) => segment.id === activeSegment.id,
     )
+    const activeSegmentProgress = progress.segments[activeSegment.id]
+    const isActiveSegmentCompleted =
+      activeSegmentProgress?.status === 'completed'
+    const showCompletedSegmentView =
+      isReviewMode || tutorViewSegmentId !== null || isActiveSegmentCompleted
 
     const previousContext = version.segmenti
       .slice(0, activeIndex)
@@ -506,7 +557,7 @@ export function VersionTranslator({
             id: segment.id,
             segmentNumber: index + 1,
             latino: getVersionSegmentLatinText(segment),
-            traduzione: segmentProgress.traduzioneSegmento?.trim() ?? '',
+            traduzione: getSegmentDisplayTranslation(segmentProgress),
           },
         ]
       })
@@ -521,24 +572,32 @@ export function VersionTranslator({
           title={`${title} · Segmento ${activeIndex + 1}`}
           segmentMaxReward={activeSegment.compenso_assegnato}
           previousContext={previousContext}
-          isReviewMode={isReviewMode}
+          isReviewMode={showCompletedSegmentView}
+          isSegmentCompleted={isActiveSegmentCompleted}
+          savedFinalTranslation={getSegmentDisplayTranslation(
+            activeSegmentProgress,
+          )}
+          onSaveFinalTranslation={(translation) =>
+            handleSaveSegmentFreeTranslation(activeSegment.id, translation)
+          }
           showTutorForceComplete={
             canUseTutorOverride &&
-            !isReviewMode &&
-            progress.segments[activeSegment.id]?.status !== 'completed'
+            !showCompletedSegmentView &&
+            !isActiveSegmentCompleted
           }
           onTutorForceComplete={() => requestTutorForceComplete(activeSegment)}
           initialReview={
-            isReviewMode
-              ? buildPeriodReviewState(
-                  activeSegment,
-                  progress.segments[activeSegment.id],
-                )
+            showCompletedSegmentView
+              ? buildPeriodReviewState(activeSegment, activeSegmentProgress)
               : undefined
           }
           onCancel={() => {
             if (isReviewMode) {
               setReviewSegmentId(null)
+              return
+            }
+            if (tutorViewSegmentId !== null) {
+              setTutorViewSegmentId(null)
               return
             }
             void handleCancelSegment()
@@ -721,9 +780,21 @@ export function VersionTranslator({
                       <button
                         type="button"
                         onClick={() => setReviewSegmentId(segment.id)}
-                        className="mt-4 rounded-lg border border-slate-300 bg-white px-5 py-2.5 text-sm font-medium text-slate-700 shadow-sm transition-colors can-hover:hover:bg-slate-50"
+                        className="rounded-lg border border-slate-300 bg-white px-5 py-2.5 text-sm font-medium text-slate-700 shadow-sm transition-colors can-hover:hover:bg-slate-50"
                       >
                         Vedi Dettaglio
+                      </button>
+                    ) : null}
+
+                    {canUseTutorOverride &&
+                    !isReviewMode &&
+                    status === 'completed' ? (
+                      <button
+                        type="button"
+                        onClick={() => setTutorViewSegmentId(segment.id)}
+                        className="rounded-lg border border-slate-300 bg-white px-5 py-2.5 text-sm font-medium text-slate-700 shadow-sm transition-colors can-hover:hover:bg-slate-50"
+                      >
+                        Modifica traduzione
                       </button>
                     ) : null}
                   </GlassCard>

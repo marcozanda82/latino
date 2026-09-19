@@ -98,10 +98,25 @@ export interface VersionExercise {
 export interface VersionSegmentProgress {
   status: VersionSegmentProgressStatus
   mechanicalScore?: number
+  /** Traduzione fluida originale al completamento del segmento. */
   traduzioneSegmento?: string
+  /** Traduzione libera modificata post-completamento (override tutor/demo). */
+  traduzioneLiberaStudente?: string
   xpScore?: number
   stepAnswers?: VersionSegmentStepAnswers
   draft?: ExerciseDraftData
+}
+
+/** Traduzione fluida effettiva mostrata e consegnata (priorità alla versione editata). */
+export function getSegmentDisplayTranslation(
+  segmentProgress?: VersionSegmentProgress,
+): string {
+  if (!segmentProgress) return ''
+  return (
+    segmentProgress.traduzioneLiberaStudente?.trim() ||
+    segmentProgress.traduzioneSegmento?.trim() ||
+    ''
+  )
 }
 
 export interface VersionProgress {

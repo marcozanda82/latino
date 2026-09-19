@@ -127,6 +127,11 @@ function normalizeSegmentProgress(value: unknown): VersionSegmentProgress | null
     ...(typeof data.traduzioneSegmento === 'string'
       ? { traduzioneSegmento: data.traduzioneSegmento }
       : {}),
+    ...(typeof data.traduzioneLiberaStudente === 'string'
+      ? { traduzioneLiberaStudente: data.traduzioneLiberaStudente }
+      : typeof data.traduzione_libera_studente === 'string'
+        ? { traduzioneLiberaStudente: data.traduzione_libera_studente }
+        : {}),
     ...(typeof data.xpScore === 'number' ? { xpScore: data.xpScore } : {}),
     ...(normalizeStepAnswers(data.stepAnswers)
       ? { stepAnswers: normalizeStepAnswers(data.stepAnswers) }
@@ -449,6 +454,42 @@ export async function patchVersionProgressSegments(
   } catch (error) {
     console.error(
       '[versionProgressService] patchVersionProgressSegments failed:',
+      error,
+    )
+    throw error
+  }
+}
+
+/** Aggiorna solo la traduzione libera editata di un segmento completato. */
+export async function patchSegmentFreeTranslation(
+  userId: string,
+  levelId: string,
+  segmentId: number,
+  traduzioneLiberaStudente: string,
+): Promise<void> {
+  if (!userId.trim() || !levelId.trim()) return
+
+  const trimmed = traduzioneLiberaStudente.trim()
+  if (!trimmed) {
+    throw new Error('La traduzione non può essere vuota.')
+  }
+
+  const docRef = getVersionProgressDocRef(userId, levelId)
+
+  try {
+    const snapshot = await getDoc(docRef)
+    if (!snapshot.exists()) {
+      throw new Error('Progressi versione non trovati.')
+    }
+
+    await updateDoc(docRef, {
+      [`segments.${segmentId}.traduzioneLiberaStudente`]: trimmed,
+      updatedAt: new Date().toISOString(),
+      savedAt: serverTimestamp(),
+    })
+  } catch (error) {
+    console.error(
+      '[versionProgressService] patchSegmentFreeTranslation failed:',
       error,
     )
     throw error

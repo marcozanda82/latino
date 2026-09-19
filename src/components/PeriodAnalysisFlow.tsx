@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Mic, MicOff, RotateCcw, Wand2 } from 'lucide-react'
+import { Mic, MicOff, Pencil, RotateCcw, Wand2 } from 'lucide-react'
+import { useDemoMode } from '../context/DemoModeContext'
 import { AppLayout } from './layout/AppLayout'
 import { GlassCard } from './ui/GlassCard'
 import {
@@ -16,7 +17,7 @@ import type { Proposizione, ProposizioneTipo, VersionSegment } from '../types/ve
 import { getVersionSegmentLatinText } from '../types/version'
 import { calculateSegmentReward } from '../utils/scoring'
 import { useSpeechToText } from '../hooks/useSpeechToText'
-import { showError } from '../lib/toast'
+import { showError, showSuccess } from '../lib/toast'
 import { getVersionSegmentPrimaryProposizione } from '../utils/proposizione'
 import type { PeriodReviewState } from '../utils/reviewState'
 
@@ -41,6 +42,9 @@ export interface PeriodAnalysisFlowProps {
   initialReview?: PeriodReviewState
   showTutorForceComplete?: boolean
   onTutorForceComplete?: () => void
+  isSegmentCompleted?: boolean
+  savedFinalTranslation?: string
+  onSaveFinalTranslation?: (translation: string) => Promise<void>
 }
 
 export function PeriodAnalysisFlow({
@@ -54,7 +58,11 @@ export function PeriodAnalysisFlow({
   initialReview,
   showTutorForceComplete = false,
   onTutorForceComplete,
+  isSegmentCompleted = false,
+  savedFinalTranslation = '',
+  onSaveFinalTranslation,
 }: PeriodAnalysisFlowProps) {
+  const { canUseTutorOverride } = useDemoMode()
   const [resolvedIds, setResolvedIds] = useState<Set<string>>(
     () => new Set(initialReview?.resolvedIds ?? []),
   )
@@ -66,7 +74,22 @@ export function PeriodAnalysisFlow({
     initialReview?.finalTranslation ?? '',
   )
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isEditingTranslation, setIsEditingTranslation] = useState(false)
+  const [editedTranslation, setEditedTranslation] = useState(
+    savedFinalTranslation || initialReview?.finalTranslation || '',
+  )
+  const [isSavingTranslation, setIsSavingTranslation] = useState(false)
   const speechBaseRef = useRef('')
+
+  const isCompletedView = isReviewMode || isSegmentCompleted
+  const displayedFinalTranslation =
+    savedFinalTranslation.trim() || finalTranslation.trim()
+
+  useEffect(() => {
+    if (!isEditingTranslation) {
+      setEditedTranslation(displayedFinalTranslation)
+    }
+  }, [displayedFinalTranslation, isEditingTranslation])
 
   const {
     isListening,
@@ -213,6 +236,42 @@ export function PeriodAnalysisFlow({
       })
     } finally {
       setIsSubmitting(false)
+    }
+  }
+
+  const handleStartEditTranslation = () => {
+    setEditedTranslation(displayedFinalTranslation)
+    setIsEditingTranslation(true)
+  }
+
+  const handleCancelEditTranslation = () => {
+    setEditedTranslation(displayedFinalTranslation)
+    setIsEditingTranslation(false)
+  }
+
+  const handleSaveEditedTranslation = async () => {
+    const trimmed = editedTranslation.trim()
+    if (!trimmed) {
+      showError('La traduzione non può essere vuota.')
+      return
+    }
+
+    if (!onSaveFinalTranslation) {
+      setFinalTranslation(trimmed)
+      setIsEditingTranslation(false)
+      return
+    }
+
+    setIsSavingTranslation(true)
+    try {
+      await onSaveFinalTranslation(trimmed)
+      setFinalTranslation(trimmed)
+      setIsEditingTranslation(false)
+      showSuccess('Traduzione aggiornata.')
+    } catch {
+      showError('Impossibile salvare la traduzione. Riprova.')
+    } finally {
+      setIsSavingTranslation(false)
     }
   }
 
@@ -416,19 +475,74 @@ export function PeriodAnalysisFlow({
         </div>
 
         <AnimatePresence>
-          {(allMicroComplete || isReviewMode) && finalTranslation.trim() ? (
+          {(allMicroComplete || isCompletedView) &&
+          displayedFinalTranslation ? (
             <motion.section
               initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
               className="mt-8 rounded-xl border border-slate-200 bg-white p-6 shadow-sm"
             >
-              <h2 className="text-sm font-semibold text-slate-800">
-                Traduzione finale del segmento
-              </h2>
-              {isReviewMode ? (
-                <p className="mt-3 text-base leading-relaxed text-slate-800">
-                  {finalTranslation}
-                </p>
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <h2 className="text-sm font-semibold text-slate-800">
+                  Traduzione finale del segmento
+                </h2>
+                {isCompletedView &&
+                canUseTutorOverride &&
+                !isEditingTranslation &&
+                onSaveFinalTranslation ? (
+                  <button
+                    type="button"
+                    onClick={handleStartEditTranslation}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 shadow-sm transition-colors can-hover:hover:border-slate-300 can-hover:hover:bg-slate-50 can-hover:hover:text-slate-800"
+                    title="Modifica traduzione libera"
+                  >
+                    <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
+                    Modifica
+                  </button>
+                ) : null}
+              </div>
+              {isCompletedView ? (
+                isEditingTranslation ? (
+                  <div className="mt-4">
+                    <label
+                      htmlFor="segment-final-translation-edit"
+                      className="sr-only"
+                    >
+                      Modifica traduzione finale del segmento
+                    </label>
+                    <textarea
+                      id="segment-final-translation-edit"
+                      rows={4}
+                      value={editedTranslation}
+                      onChange={(event) =>
+                        setEditedTranslation(event.target.value)
+                      }
+                      className="w-full resize-y rounded-lg border border-slate-200 bg-white px-4 py-3 text-base text-slate-800 shadow-sm outline-none transition-colors placeholder:text-slate-400 focus:border-slate-400"
+                    />
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => void handleSaveEditedTranslation()}
+                        disabled={isSavingTranslation || !editedTranslation.trim()}
+                        className="rounded-lg bg-slate-800 px-5 py-2.5 text-sm font-medium text-white shadow-sm transition-colors can-hover:hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400"
+                      >
+                        {isSavingTranslation ? 'Salvataggio…' : 'Salva'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleCancelEditTranslation}
+                        disabled={isSavingTranslation}
+                        className="rounded-lg border border-slate-300 bg-white px-5 py-2.5 text-sm font-medium text-slate-700 transition-colors can-hover:hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        Annulla
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="mt-3 text-base leading-relaxed text-slate-800">
+                    {displayedFinalTranslation}
+                  </p>
+                )
               ) : (
                 <>
                   <p className="mt-1 text-sm text-slate-500">

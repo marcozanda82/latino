@@ -7,6 +7,7 @@ import type {
   VersionSegmentProgress,
   VersionSegmentStepAnswers,
 } from '../types/version'
+import { getSegmentDisplayTranslation } from '../types/version'
 import { proposizioneToLatinAnalysis } from './proposizione'
 import { getVersionSegmentPrimaryProposizione } from './proposizione'
 
@@ -277,6 +278,6 @@ export function buildPeriodReviewState(
       String(proposizione.id),
     ),
     microResults,
-    finalTranslation: segmentProgress?.traduzioneSegmento?.trim() ?? '',
+    finalTranslation: getSegmentDisplayTranslation(segmentProgress),
   }
 }
